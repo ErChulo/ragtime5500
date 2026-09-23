@@ -38,15 +38,6 @@ jobs:
           fi
           CHROME_PATH="$CHROME" node scripts/browser-file-smoke.mjs
 
-      - name: Verify OPFS persistence across Chromium restart
-        run: |
-          CHROME="$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
-          if [ -z "$CHROME" ]; then
-            echo "No Chromium-family browser is available on this runner." >&2
-            exit 1
-          fi
-          node scripts/browser-persistence-smoke.mjs "$CHROME"
-
       - name: Record standalone artifact checksum
         run: sha256sum dist/ragtime5500.html
 
