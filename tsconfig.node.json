@@ -4,9 +4,14 @@
     "skipLibCheck": true,
     "module": "ESNext",
     "moduleResolution": "Bundler",
-    "allowImportingTsExtensions": true,
     "strict": true,
-    "types": ["node"]
+    "types": [
+      "node"
+    ]
   },
-  "include": ["vite.config.ts", "scripts/**/*.mjs", "tests/**/*.ts"]
+  "include": [
+    "vite.config.ts",
+    "scripts/**/*.mjs",
+    "tests/**/*.ts"
+  ]
 }

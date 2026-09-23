@@ -18,9 +18,9 @@ export async function renderPdfPage(bytes: Uint8Array, pageNumber: number, canva
     const context = canvas.getContext('2d');
     if (!context) throw new Error('Canvas 2D context unavailable.');
     context.setTransform(deviceScale, 0, 0, deviceScale, 0, 0);
-    await page.render({ canvasContext: context, viewport }).promise;
+    await page.render({ canvas, canvasContext: context, viewport }).promise;
     page.cleanup();
   } finally {
-    await pdf.destroy();
+    await loadingTask.destroy();
   }
 }
