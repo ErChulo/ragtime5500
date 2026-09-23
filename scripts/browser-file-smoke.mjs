@@ -11,6 +11,55 @@ const htmlPath = resolve('dist/ragtime5500.html');
 const profile = await mkdtemp(join(tmpdir(), 'ragtime5500-ci-profile-'));
 const sentinel = 'Ragtime CI Persistence Sentinel';
 
+const syntheticCase = 'Ragtime Synthetic Import Case';
+const syntheticPdfName = 'SYNTHETICFILING1234567890.pdf';
+const syntheticCsvText = [
+  'PN,Plan Name,Date Received,Plan Codes,Plan Year,Participants,Participants EOY,Assets BOY,Assets,Link',
+  '001,Synthetic Pension Plan,09/23/2026,DB,2024,10,9,1200000,1100000,https://example.invalid/SYNTHETICFILING1234567890.pdf',
+  '',
+].join('\n');
+
+function pdfEscape(value) {
+  return value.replace(/[\\()]/g, (character) => `\\${character}`);
+}
+
+function buildSyntheticPdfBase64() {
+  const stream = [
+    'BT /F1 14 Tf 1 0 0 1 50 740 Tm (Schedule H) Tj ET',
+    'BT /F1 11 Tf 1 0 0 1 50 715 Tm (Plan Year beginning 2024) Tj ET',
+    'BT /F1 11 Tf 1 0 0 1 50 695 Tm (Name of Plan: Synthetic Pension Plan Plan Number: 001) Tj ET',
+    `BT /F1 11 Tf 1 0 0 1 50 650 Tm (${pdfEscape('1c(9) Common collective trust')}) Tj ET`,
+    'BT /F1 11 Tf 1 0 0 1 350 650 Tm (1133669) Tj ET',
+    'BT /F1 11 Tf 1 0 0 1 470 650 Tm (957892) Tj ET',
+  ].join('\n');
+
+  const objects = [
+    '1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n',
+    '2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n',
+    '3 0 obj\n<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>\nendobj\n',
+    '4 0 obj\n<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>\nendobj\n',
+    `5 0 obj\n<< /Length ${Buffer.byteLength(stream, 'latin1')} >>\nstream\n${stream}\nendstream\nendobj\n`,
+  ];
+
+  let pdf = '%PDF-1.4\n';
+  const offsets = [0];
+  for (const object of objects) {
+    offsets.push(Buffer.byteLength(pdf, 'latin1'));
+    pdf += object;
+  }
+
+  const xrefOffset = Buffer.byteLength(pdf, 'latin1');
+  pdf += `xref\n0 ${objects.length + 1}\n`;
+  pdf += '0000000000 65535 f \n';
+  for (let index = 1; index <= objects.length; index += 1) {
+    pdf += `${String(offsets[index]).padStart(10, '0')} 00000 n \n`;
+  }
+  pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF\n`;
+  return Buffer.from(pdf, 'latin1').toString('base64');
+}
+
+const syntheticPdfBase64 = buildSyntheticPdfBase64();
+
 const sleep = (ms) => new Promise((resolveSleep) => setTimeout(resolveSleep, ms));
 
 async function debuggerPage(port) {
@@ -278,6 +327,96 @@ async function closeChrome(session) {
   ]);
 }
 
+async function setInputFile(cdp, selector, filename, mimeType, base64Bytes) {
+  const changed = await evaluate(cdp, `(() => {
+    const input = document.querySelector(${JSON.stringify(selector)});
+    if (!(input instanceof HTMLInputElement)) return false;
+    const binary = atob(${JSON.stringify(base64Bytes)});
+    const bytes = new Uint8Array(binary.length);
+    for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+    const transfer = new DataTransfer();
+    transfer.items.add(new File([bytes], ${JSON.stringify(filename)}, { type: ${JSON.stringify(mimeType)} }));
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'files')?.set;
+    if (!setter) return false;
+    setter.call(input, transfer.files);
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+    return input.files?.length === 1;
+  })()`);
+  if (!changed) throw new Error(`Unable to attach synthetic file to ${selector}.`);
+}
+
+async function importSyntheticVerticalSlice(cdp) {
+  await evaluate(cdp, `location.hash = '#/import'`);
+  await waitFor(cdp, `document.body.innerText.includes('Import eFAST CSV')`, 'import route');
+
+  await evaluate(cdp, `(() => {
+    const input = document.querySelector('input[placeholder="Internal case label"]');
+    if (!(input instanceof HTMLInputElement)) return false;
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+    setter?.call(input, ${JSON.stringify(syntheticCase)});
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    return true;
+  })()`);
+
+  await setInputFile(
+    cdp,
+    'input[accept*=".csv"]',
+    'synthetic-efast.csv',
+    'text/csv',
+    Buffer.from(syntheticCsvText, 'utf8').toString('base64'),
+  );
+
+  await waitFor(
+    cdp,
+    `Array.from(document.querySelectorAll('button')).some((button) => button.textContent.trim() === 'Import CSV' && !button.disabled)`,
+    'enabled CSV import button',
+  );
+  await evaluate(cdp, `Array.from(document.querySelectorAll('button')).find((button) => button.textContent.trim() === 'Import CSV')?.click()`);
+  await waitFor(cdp, `document.body.innerText.includes('Imported 1 raw rows.')`, 'synthetic eFAST CSV import', 20000);
+
+  await setInputFile(
+    cdp,
+    'input[accept*="application/pdf"]',
+    syntheticPdfName,
+    'application/pdf',
+    syntheticPdfBase64,
+  );
+  await waitFor(
+    cdp,
+    `Array.from(document.querySelectorAll('button')).some((button) => button.textContent.trim() === 'Import 1 PDF' && !button.disabled)`,
+    'enabled PDF import button',
+  );
+  await evaluate(cdp, `Array.from(document.querySelectorAll('button')).find((button) => button.textContent.trim() === 'Import 1 PDF')?.click()`);
+  await waitFor(
+    cdp,
+    `document.body.innerText.includes(${JSON.stringify(syntheticPdfName)}) && document.body.innerText.includes('AUTO_ACCEPTED') && document.body.innerText.includes('Extracted H/I/1C9 BOY=1,133,669 and EOY=957,892')`,
+    'synthetic PDF match and 1C9 extraction',
+    30000,
+  );
+
+  await evaluate(cdp, `location.hash = '#/explore'`);
+  await waitFor(cdp, `document.body.innerText.includes('Exact structured query')`, 'explore route');
+  await evaluate(cdp, `Array.from(document.querySelectorAll('button')).find((button) => button.textContent.trim() === 'Run structured query')?.click()`);
+  await waitFor(
+    cdp,
+    `document.body.innerText.includes('1 structured value matched.') && document.body.innerText.includes('957,892') && document.body.innerText.includes(${JSON.stringify(syntheticPdfName)})`,
+    'SQL-backed provenance query for synthetic EOY value',
+    15000,
+  );
+}
+
+async function verifySyntheticVerticalSlice(cdp) {
+  await evaluate(cdp, `location.hash = '#/explore'`);
+  await waitFor(cdp, `document.body.innerText.includes('Exact structured query')`, 'persisted explore route');
+  await evaluate(cdp, `Array.from(document.querySelectorAll('button')).find((button) => button.textContent.trim() === 'Run structured query')?.click()`);
+  await waitFor(
+    cdp,
+    `document.body.innerText.includes('1 structured value matched.') && document.body.innerText.includes('957,892') && document.body.innerText.includes(${JSON.stringify(syntheticPdfName)})`,
+    'persisted synthetic structured value and provenance',
+    15000,
+  );
+}
+
 async function firstRun() {
   const externalRequests = [];
   const browserMessages = [];
@@ -309,6 +448,8 @@ async function firstRun() {
       'persistence sentinel case creation',
     );
 
+    await importSyntheticVerticalSlice(session.cdp);
+
     if (externalRequests.length) {
       throw new Error(`Outbound HTTP(S) requests detected during first file-protocol run: ${externalRequests.join(', ')}`);
     }
@@ -339,6 +480,8 @@ async function secondRun() {
       `Array.from(document.querySelector('select[aria-label="Cases"]')?.options ?? []).some((option) => option.textContent.includes(${JSON.stringify(sentinel)}))`,
       'persistence sentinel after complete browser restart',
     );
+
+    await verifySyntheticVerticalSlice(session.cdp);
 
     await evaluate(session.cdp, `location.hash = '#/database'`);
     await waitFor(
@@ -400,7 +543,7 @@ async function secondRun() {
 try {
   await firstRun();
   await secondRun();
-  process.stdout.write('FILE-BROWSER SMOKE: PASS — direct file startup, hash routing, OPFS browser-restart persistence, integrity reopen, and zero outbound HTTP(S).\n');
+  process.stdout.write('FILE-BROWSER SMOKE: PASS — direct file startup, synthetic CSV/PDF import, automatic matching, 1C9 extraction, SQL provenance retrieval, OPFS browser-restart persistence, integrity reopen, and zero outbound HTTP(S).\n');
 } finally {
   await rm(profile, { recursive: true, force: true });
 }
