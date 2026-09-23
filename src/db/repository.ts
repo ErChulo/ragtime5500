@@ -741,13 +741,3 @@ export async function listSourceDocumentsForIntegrity(): Promise<Array<{
     sourceType: String(row.source_type),
   }));
 }
-
-export async function listAuditLog(limit = 100): Promise<Array<Record<string, unknown>>> {
-  const safeLimit = Math.max(1, Math.min(500, Math.trunc(limit)));
-  return db.exec(`
-    SELECT audit_id, entity_type, entity_id, action, old_value, new_value, timestamp
-    FROM audit_log
-    ORDER BY audit_id DESC
-    LIMIT ?
-  `, [safeLimit]);
-}
