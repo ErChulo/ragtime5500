@@ -1,0 +1,36 @@
+name: Ragtime 5500 CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Test, build, and security audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install development dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Run complete source check
+        run: npm run check
+
+      - name: Explain CI boundary
+        if: always()
+        run: |
+          echo "GitHub Actions is development-only infrastructure."
+          echo "The production Ragtime 5500 runtime remains local and air-gapped."
