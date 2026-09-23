@@ -78,7 +78,7 @@ export default function App() {
           ) : null}
           {activeSection === 'review' ? (
             <>
-              <MatchReview refreshToken={refreshToken} />
+              <MatchReview refreshToken={refreshToken} onChanged={refresh} />
               <ExtractionReview refreshToken={refreshToken} onChanged={refresh} />
             </>
           ) : null}
