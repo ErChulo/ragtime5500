@@ -96,8 +96,7 @@ class CdpClient {
   }
 }
 
-async function launch(initialHash) {
-  const initialUrl = `${pathToFileURL(htmlPath).href}#/${initialHash}`;
+async function launch() {
   const child = spawn(chromePath, [
     '--headless=new',
     '--no-sandbox',
@@ -112,8 +111,9 @@ async function launch(initialHash) {
     '--disable-features=OptimizationHints,MediaRouter',
     '--remote-debugging-address=127.0.0.1',
     '--remote-debugging-port=0',
+    '--allow-file-access-from-files',
     `--user-data-dir=${profile}`,
-    initialUrl,
+    'about:blank',
   ], { stdio: ['ignore', 'ignore', 'pipe'] });
 
   let stderr = '';
@@ -185,15 +185,32 @@ async function waitFor(cdp, expression, description, timeoutMs = 12000) {
   throw new Error(`Timed out waiting for ${description}.`);
 }
 
-async function verifyLoadedAndCollect(cdp, externalRequests) {
+async function verifyLoadedAndCollect(cdp, hash, externalRequests, browserMessages) {
   await cdp.send('Runtime.enable');
   await cdp.send('Page.enable');
   await cdp.send('Network.enable');
+  await cdp.send('Log.enable');
+
   cdp.on('Network.requestWillBeSent', (params) => {
     const url = params?.request?.url ?? '';
     if (/^https?:\/\//i.test(url)) externalRequests.push(url);
   });
+  cdp.on('Log.entryAdded', (params) => {
+    const entry = params?.entry;
+    if (entry) browserMessages.push(`LOG ${entry.level}: ${entry.text}`);
+  });
+  cdp.on('Runtime.exceptionThrown', (params) => {
+    const details = params?.exceptionDetails;
+    if (details) browserMessages.push(`EXCEPTION: ${details.text ?? ''} ${details.exception?.description ?? ''}`);
+  });
+  cdp.on('Runtime.consoleAPICalled', (params) => {
+    if (params?.type === 'error' || params?.type === 'warning') {
+      browserMessages.push(`CONSOLE ${params.type}: ${(params.args ?? []).map((arg) => arg.value ?? arg.description ?? '').join(' ')}`);
+    }
+  });
 
+  const url = `${pathToFileURL(htmlPath).href}#/${hash}`;
+  await cdp.send('Page.navigate', { url });
   await waitFor(
     cdp,
     `document.readyState === 'complete' && document.body && document.body.innerText.includes('Database ready')`,
@@ -201,7 +218,6 @@ async function verifyLoadedAndCollect(cdp, externalRequests) {
     20000,
   );
 }
-
 async function closeChrome(session) {
   try {
     await session.cdp.send('Browser.close');
@@ -218,9 +234,10 @@ async function closeChrome(session) {
 
 async function firstRun() {
   const externalRequests = [];
-  const session = await launch('workspace');
+  const browserMessages = [];
+  const session = await launch();
   try {
-    await verifyLoadedAndCollect(session.cdp, externalRequests);
+    await verifyLoadedAndCollect(session.cdp, 'workspace', externalRequests, browserMessages);
 
     await evaluate(session.cdp, `(() => {
       const input = document.querySelector('input[aria-label="Case name"]');
@@ -251,7 +268,7 @@ async function firstRun() {
     }
   } catch (error) {
     const snapshot = await evaluate(session.cdp, `JSON.stringify({ href: location.href, title: document.title, text: document.body?.innerText?.slice(0, 4000) ?? '', html: document.documentElement?.outerHTML?.slice(0, 4000) ?? '' })`).catch(() => 'browser snapshot unavailable');
-    throw new Error(`${error instanceof Error ? error.message : String(error)}\nBrowser snapshot:\n${snapshot}\nChrome stderr:\n${session.stderr()}`);
+    throw new Error(`${error instanceof Error ? error.message : String(error)}\nBrowser snapshot:\n${snapshot}\nBrowser messages:\n${browserMessages.join('\n')}\nChrome stderr:\n${session.stderr()}`);
   } finally {
     await closeChrome(session);
   }
@@ -259,9 +276,10 @@ async function firstRun() {
 
 async function secondRun() {
   const externalRequests = [];
-  const session = await launch('workspace');
+  const browserMessages = [];
+  const session = await launch();
   try {
-    await verifyLoadedAndCollect(session.cdp, externalRequests);
+    await verifyLoadedAndCollect(session.cdp, 'workspace', externalRequests, browserMessages);
 
     await waitFor(
       session.cdp,
