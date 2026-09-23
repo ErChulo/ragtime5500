@@ -110,6 +110,7 @@ async function launch(initialHash) {
     '--metrics-recording-only',
     '--no-first-run',
     '--disable-features=OptimizationHints,MediaRouter',
+    '--remote-debugging-address=127.0.0.1',
     `--remote-debugging-port=${port}`,
     `--user-data-dir=${profile}`,
     initialUrl,
@@ -118,7 +119,14 @@ async function launch(initialHash) {
   let stderr = '';
   child.stderr.on('data', (chunk) => { stderr += String(chunk); });
 
-  const page = await debuggerPage();
+  let page;
+  try {
+    page = await debuggerPage();
+  } catch (error) {
+    child.kill('SIGKILL');
+    throw new Error(`${error instanceof Error ? error.message : String(error)}\nChrome stderr:\n${stderr}`);
+  }
+
   const cdp = new CdpClient(page.webSocketDebuggerUrl);
   await cdp.ready();
   return { child, cdp, stderr: () => stderr };
