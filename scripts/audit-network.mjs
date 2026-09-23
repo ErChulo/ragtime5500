@@ -7,6 +7,7 @@ const ignored = new Set([
   'src/security/networkLockdown.ts',
   'scripts/audit-network.mjs',
   'scripts/serve-dist.mjs',
+  'scripts/browser-persistence-smoke.mjs',
   'scripts/browser-file-smoke.mjs',
 ]);
 
