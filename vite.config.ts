@@ -34,6 +34,28 @@ function sha256Csp(value: string): string {
   return `'sha256-${createHash('sha256').update(value).digest('base64')}'`;
 }
 
+function mimeType(fileName: string): string {
+  if (fileName.endsWith('.js') || fileName.endsWith('.mjs')) return 'text/javascript';
+  if (fileName.endsWith('.wasm')) return 'application/wasm';
+  if (fileName.endsWith('.json')) return 'application/json';
+  if (fileName.endsWith('.svg')) return 'image/svg+xml';
+  if (fileName.endsWith('.png')) return 'image/png';
+  if (fileName.endsWith('.jpg') || fileName.endsWith('.jpeg')) return 'image/jpeg';
+  return 'application/octet-stream';
+}
+
+function sourceBytes(source: string | Uint8Array): Buffer {
+  return typeof source === 'string' ? Buffer.from(source, 'utf8') : Buffer.from(source);
+}
+
+function replaceAssetReference(source: string, fileName: string, dataUri: string): string {
+  const escaped = escapeRegExp(fileName);
+  return source
+    .replace(new RegExp(`(["'])\\./${escaped}\\1`, 'g'), (_match, quote) => `${quote}${dataUri}${quote}`)
+    .replace(new RegExp(`(["'])/${escaped}\\1`, 'g'), (_match, quote) => `${quote}${dataUri}${quote}`)
+    .replace(new RegExp(`(["'])${escaped}\\1`, 'g'), (_match, quote) => `${quote}${dataUri}${quote}`);
+}
+
 function singleHtmlBundle(): Plugin {
   return {
     name: 'ragtime5500-single-html',
@@ -49,6 +71,24 @@ function singleHtmlBundle(): Plugin {
       let html = String(htmlAsset.source);
       const styles: string[] = [];
       const scripts: string[] = [];
+
+      const embeddedAssets = new Map<string, string>();
+      for (const [fileName, output] of Object.entries(bundle)) {
+        if (fileName === htmlKey || output.type !== 'asset' || fileName.endsWith('.css')) continue;
+        const base64 = sourceBytes(output.source).toString('base64');
+        embeddedAssets.set(fileName, `data:${mimeType(fileName)};base64,${base64}`);
+      }
+
+      for (const output of Object.values(bundle)) {
+        if (output.type !== 'chunk') continue;
+        for (const [fileName, dataUri] of embeddedAssets) {
+          output.code = replaceAssetReference(output.code, fileName, dataUri);
+        }
+      }
+      for (const [fileName, dataUri] of embeddedAssets) {
+        html = replaceAssetReference(html, fileName, dataUri);
+        delete bundle[fileName];
+      }
 
       for (const [fileName, output] of Object.entries(bundle)) {
         if (fileName === htmlKey) continue;
