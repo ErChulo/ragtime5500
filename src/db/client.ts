@@ -1,4 +1,4 @@
-import DbWorker from './worker?worker&inline';
+import dbWorkerUrl from './worker?worker&url';
 
 type BindValue = string | number | bigint | null | Uint8Array;
 export type SqlBind = BindValue[] | Record<string, BindValue>;
@@ -21,13 +21,31 @@ type WorkerResponse =
   | { id: number; ok: true; result: unknown }
   | { id: number; ok: false; error: string };
 
+function workerFromBundledUrl(url: string): Worker {
+  if (!url.startsWith('data:')) {
+    return new Worker(url, { type: 'module', name: 'ragtime5500-db' });
+  }
+
+  const separator = url.indexOf(',');
+  if (separator < 0 || !url.slice(0, separator).includes(';base64')) {
+    throw new Error('Embedded database worker URL is not a base64 data URI.');
+  }
+
+  const binary = atob(url.slice(separator + 1));
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+
+  const blobUrl = URL.createObjectURL(new Blob([bytes], { type: 'text/javascript' }));
+  return new Worker(blobUrl, { type: 'module', name: 'ragtime5500-db' });
+}
+
 export class DbClient {
   private readonly worker: Worker;
   private nextId = 1;
   private readonly pending = new Map<number, Pending>();
 
   constructor() {
-    this.worker = new DbWorker();
+    this.worker = workerFromBundledUrl(dbWorkerUrl);
     this.worker.onmessage = (event: MessageEvent<WorkerResponse>) => {
       const response = event.data;
       const pending = this.pending.get(response.id);
