@@ -48,6 +48,12 @@ function readUint32(bytes: Uint8Array): number {
   return new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength).getUint32(0, false);
 }
 
+function asArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  const copy = new Uint8Array(bytes.byteLength);
+  copy.set(bytes);
+  return copy.buffer;
+}
+
 function sameBytes(a: Uint8Array, b: Uint8Array): boolean {
   if (a.byteLength !== b.byteLength) return false;
   for (let index = 0; index < a.byteLength; index += 1) {
@@ -139,7 +145,13 @@ export async function createWorkspaceArchive(): Promise<{ blob: Blob; result: Wo
   if (manifestBytes.byteLength > MAX_MANIFEST_BYTES) throw new Error('Workspace archive manifest is unexpectedly large.');
 
   const blob = new Blob(
-    [MAGIC, uint32Bytes(manifestBytes.byteLength), manifestBytes, sqliteBytes, ...sourceBytes],
+    [
+      asArrayBuffer(MAGIC),
+      asArrayBuffer(uint32Bytes(manifestBytes.byteLength)),
+      asArrayBuffer(manifestBytes),
+      asArrayBuffer(sqliteBytes),
+      ...sourceBytes.map(asArrayBuffer),
+    ],
     { type: 'application/octet-stream' },
   );
 
