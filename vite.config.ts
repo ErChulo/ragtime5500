@@ -151,6 +151,9 @@ export default defineConfig({
     format: 'es',
     plugins: () => [inlineSqliteWasm()],
     rollupOptions: {
+      treeshake: {
+        moduleSideEffects: (id) => !id.includes('@sqlite.org/sqlite-wasm'),
+      },
       output: {
         inlineDynamicImports: true,
       },
