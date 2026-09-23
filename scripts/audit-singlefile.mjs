@@ -28,7 +28,7 @@ const shell = html
   .replace(/<style>[\s\S]*?<\/style>/i, '<style></style>')
   .replace(/<script\s+type=["']module["']>[\s\S]*?<\/script>/i, '<script type="module"></script>');
 
-if (!/<style>[\s\S]+<\/style>/i.test(html)) violations.push('compiled CSS is not inlined');
+if (!/<style\\b[^>]*\\bnonce=["']ragtime5500-local-runtime-v1["'][^>]*>[\\s\\S]+<\\/style>/i.test(html)) violations.push('compiled CSS is not inlined with the required CSP nonce');
 if (!/<script\s+type=["']module["']>[\s\S]+<\/script>/i.test(html)) violations.push('compiled JavaScript is not inlined');
 if (/<script\b[^>]*\bsrc\s*=/i.test(shell)) violations.push('HTML shell still references an external script asset');
 if (/<link\b[^>]*\bhref\s*=/i.test(shell)) violations.push('HTML shell still references an external link asset');
@@ -36,8 +36,8 @@ if (/<(?:img|source|audio|video|iframe)\b[^>]*\bsrc\s*=\s*["'](?!data:|blob:|#)/
   violations.push('HTML shell still references a non-embedded media asset');
 }
 if (!/connect-src\s+'none'/.test(html)) violations.push("compiled CSP is missing connect-src 'none'");
-if (!/script-src[^;]*'sha256-[^']+'/.test(html)) violations.push('compiled CSP is missing the inline script hash');
-if (!/style-src[^;]*'sha256-[^']+'/.test(html)) violations.push('compiled CSP is missing the inline style hash');
+if (!/script-src[^;]*'nonce-ragtime5500-local-runtime-v1'/.test(html)) violations.push('compiled CSP is missing the inline script nonce');
+if (!/style-src[^;]*'nonce-ragtime5500-local-runtime-v1'/.test(html)) violations.push('compiled CSP is missing the inline style nonce');
 if (!/worker-src\s+'self'\s+blob:\s+data:/.test(html)) violations.push('compiled CSP does not allow only embedded worker transports');
 
 if (violations.length) {
