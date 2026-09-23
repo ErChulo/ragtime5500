@@ -156,14 +156,14 @@ function singleHtmlBundle(): Plugin {
       const scriptText = entryCode.replace(/<\/script/gi, '<\\/script');
       if (!styleText || !scriptText) throw new Error('Standalone build is missing inlined CSS or JavaScript.');
 
-      const scriptDirective = "script-src 'self' 'wasm-unsafe-eval'";
+      const scriptDirective = `script-src 'self' 'wasm-unsafe-eval' 'nonce-${INLINE_NONCE}'`;
       const styleDirective = "style-src 'self'";
       if (!html.includes(scriptDirective) || !html.includes(styleDirective)) {
         throw new Error('Expected CSP directives were not found before single-file inlining.');
       }
 
       html = html
-        .replace(scriptDirective, `${scriptDirective} data: 'nonce-${INLINE_NONCE}'`)
+        .replace(scriptDirective, `${scriptDirective} data:`)
         .replace(styleDirective, `${styleDirective} 'nonce-${INLINE_NONCE}'`)
         .replace('</head>', `<style nonce="${INLINE_NONCE}">${styleText}</style>\n  </head>`)
         .replace('</body>', `<script type="module" nonce="${INLINE_NONCE}">${scriptText}</script>\n  </body>`);
