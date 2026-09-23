@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -185,6 +185,19 @@ async function waitFor(cdp, expression, description, timeoutMs = 12000) {
   throw new Error(`Timed out waiting for ${description}.`);
 }
 
+
+async function sourceSnippet(lineNumber, columnNumber) {
+  try {
+    const html = await readFile(htmlPath, 'utf8');
+    const lines = html.split(/\r?\n/);
+    const line = lines[Math.max(0, Number(lineNumber))] ?? lines[Math.max(0, Number(lineNumber) - 1)] ?? '';
+    const column = Math.max(0, Number(columnNumber) || 0);
+    return line.slice(Math.max(0, column - 700), column + 700);
+  } catch {
+    return 'source snippet unavailable';
+  }
+}
+
 async function verifyLoadedAndCollect(cdp, hash, externalRequests, browserMessages) {
   await cdp.send('Runtime.enable');
   await cdp.send('Page.enable');
@@ -268,7 +281,10 @@ async function firstRun() {
     }
   } catch (error) {
     const snapshot = await evaluate(session.cdp, `JSON.stringify({ href: location.href, title: document.title, text: document.body?.innerText?.slice(0, 4000) ?? '', html: document.documentElement?.outerHTML?.slice(0, 4000) ?? '' })`).catch(() => 'browser snapshot unavailable');
-    throw new Error(`${error instanceof Error ? error.message : String(error)}\nBrowser snapshot:\n${snapshot}\nBrowser messages:\n${browserMessages.join('\n')}\nChrome stderr:\n${session.stderr()}`);
+    const exception = browserMessages.find((message) => message.startsWith('EXCEPTION @ '));
+    const locationMatch = exception?.match(/EXCEPTION @ (\\d+):(\\d+):/);
+    const snippet = locationMatch ? await sourceSnippet(Number(locationMatch[1]), Number(locationMatch[2])) : 'no exception location available';
+    throw new Error(`${error instanceof Error ? error.message : String(error)}\nBrowser snapshot:\n${snapshot}\nBrowser messages:\n${browserMessages.join('\n')}\nCompiled source snippet:\n${snippet}\nChrome stderr:\n${session.stderr()}`);
   } finally {
     await closeChrome(session);
   }
