@@ -32,6 +32,7 @@ const DB_NAME = '/ragtime5500.sqlite3';
 let sqlite3: any;
 let pool: any;
 let db: any;
+let openPromise: Promise<void> | null = null;
 
 function decodeBase64(base64: string): Uint8Array {
   const binary = atob(base64);
@@ -121,7 +122,7 @@ function assertHealthy(result: Diagnostics): void {
   }
 }
 
-async function openDatabase(): Promise<void> {
+async function openDatabaseOnce(): Promise<void> {
   if (!sqlite3) {
     const scope = globalThis as typeof globalThis & { sqlite3ApiConfig?: Record<string, unknown> };
     scope.sqlite3ApiConfig = {
@@ -133,6 +134,9 @@ async function openDatabase(): Promise<void> {
     ) => Promise<any>;
 
     sqlite3 = await initWithLocalWasm({ wasmBinary: decodeBase64(sqliteWasmBase64) });
+  }
+
+  if (!pool) {
     pool = await sqlite3.installOpfsSAHPoolVfs({
       name: 'ragtime5500-sahpool',
       directory: '.ragtime5500-sahpool',
@@ -147,6 +151,16 @@ async function openDatabase(): Promise<void> {
     db.exec('PRAGMA journal_mode = DELETE');
     await applyMigrations();
   }
+}
+
+async function openDatabase(): Promise<void> {
+  if (db) return;
+  if (!openPromise) {
+    openPromise = openDatabaseOnce().finally(() => {
+      openPromise = null;
+    });
+  }
+  await openPromise;
 }
 
 async function handle(request: Request): Promise<unknown> {
