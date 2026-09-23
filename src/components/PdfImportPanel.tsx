@@ -30,7 +30,6 @@ export function PdfImportPanel({ onImported }: { onImported: () => void }) {
         try {
           const stored = await storeLocalFile(file, 'pdf');
           const sourceDocumentId = await ensureSourceDocument(stored, 'pdf');
-          const { extractPdfPages } = await import('../pdf/extractText');
           const pages = await extractPdfPages(stored.bytes);
           const signals = inferDocumentSignals(file.name, pages);
           const matchable = await listMatchableRows();
