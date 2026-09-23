@@ -168,6 +168,7 @@ export default defineConfig({
   },
   build: {
     target: 'es2022',
+    minify: false,
     sourcemap: false,
     cssCodeSplit: false,
     assetsInlineLimit: Number.MAX_SAFE_INTEGER,
