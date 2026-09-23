@@ -26,7 +26,7 @@ export async function extractPdfPages(bytes: Uint8Array): Promise<PdfPageText[]>
         height: item.height ?? 0,
       }));
 
-      const text = tokens.map((token) => token.text).join(' ').replace(/s+/g, ' ').trim();
+      const text = tokens.map((token) => token.text).join(' ').replace(/\s+/g, ' ').trim();
       pages.push({ pageNumber, width: viewport.width, height: viewport.height, text, tokens });
       page.cleanup();
     }

@@ -23,7 +23,7 @@ async function ensurePath(path: string[]): Promise<FileSystemDirectoryHandle> {
 }
 
 function extensionOf(filename: string): string {
-  const match = filename.match(/(.[A-Za-z0-9]{1,12})$/);
+  const match = filename.match(/(\.[A-Za-z0-9]{1,12})$/);
   return match ? match[1].toLowerCase() : '';
 }
 

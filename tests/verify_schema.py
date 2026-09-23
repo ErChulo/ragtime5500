@@ -74,6 +74,7 @@ def main() -> None:
         boy = conn.execute(acceptance_sql.replace("'EOY'", "'BOY'")).fetchone()[0]
         assert boy == 1250000, boy
 
+        # Corrections preserve the previous row in revision history.
         fv_id = conn.execute("""SELECT fv.filing_value_id FROM filing_value fv
             JOIN line_definition ld ON ld.line_definition_id=fv.line_definition_id
             WHERE ld.location_reference='1C9' AND ld.subfield='EOY'""").fetchone()[0]
@@ -99,7 +100,7 @@ def main() -> None:
 
     print('SCHEMA / ACCEPTANCE SQL / REVISION / BACKUP TEST: PASS')
     print('EOY = 1175000; BOY = 1250000')
-    print('NOTE: values above are a synthetic schema fixture, not proof of any real source PDF page.')
+    print('NOTE: values above are a synthetic schema fixture, not proof of the real source PDF page.')
 
 if __name__ == '__main__':
     main()
