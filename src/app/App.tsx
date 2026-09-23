@@ -9,8 +9,6 @@ import { MatchReview } from '../components/MatchReview';
 import { ExtractionReview } from '../components/ExtractionReview';
 import { AppNavigation, appSections } from '../components/AppNavigation';
 import { BackupRestorePanel } from '../components/BackupRestorePanel';
-import { SystemDiagnosticsPanel } from '../components/SystemDiagnosticsPanel';
-import { AuditLogPanel } from '../components/AuditLogPanel';
 import { DatabaseHealthPanel } from '../components/DatabaseHealthPanel';
 import { AuditHistoryPanel } from '../components/AuditHistoryPanel';
 import { DocumentSearchPanel } from '../components/DocumentSearchPanel';
