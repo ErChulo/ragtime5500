@@ -92,7 +92,12 @@ async function openDatabase(): Promise<void> {
     };
 
     const { default: sqlite3InitModule } = await import('@sqlite.org/sqlite-wasm');
-    sqlite3 = await sqlite3InitModule({ wasmBinary: decodeBase64(sqliteWasmBase64) });
+    // The package runtime accepts Emscripten module options although its current
+    // TypeScript declaration exposes a zero-argument initializer.
+    const initWithLocalWasm = sqlite3InitModule as unknown as (
+      config: { wasmBinary: Uint8Array },
+    ) => Promise<any>;
+    sqlite3 = await initWithLocalWasm({ wasmBinary: decodeBase64(sqliteWasmBase64) });
     pool = await sqlite3.installOpfsSAHPoolVfs({
       name: 'ragtime5500-sahpool',
       directory: '.ragtime5500-sahpool',
