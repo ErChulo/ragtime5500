@@ -9,12 +9,11 @@ if (!chromePath) throw new Error('CHROME_PATH is required.');
 
 const htmlPath = resolve('dist/ragtime5500.html');
 const profile = await mkdtemp(join(tmpdir(), 'ragtime5500-ci-profile-'));
-const port = 9222;
 const sentinel = 'Ragtime CI Persistence Sentinel';
 
 const sleep = (ms) => new Promise((resolveSleep) => setTimeout(resolveSleep, ms));
 
-async function debuggerPage() {
+async function debuggerPage(port) {
   let lastError;
   for (let attempt = 0; attempt < 80; attempt += 1) {
     try {
@@ -103,6 +102,7 @@ async function launch(initialHash) {
     '--headless=new',
     '--no-sandbox',
     '--disable-gpu',
+    '--disable-dev-shm-usage',
     '--disable-background-networking',
     '--disable-component-update',
     '--disable-default-apps',
@@ -111,17 +111,50 @@ async function launch(initialHash) {
     '--no-first-run',
     '--disable-features=OptimizationHints,MediaRouter',
     '--remote-debugging-address=127.0.0.1',
-    `--remote-debugging-port=${port}`,
+    '--remote-debugging-port=0',
     `--user-data-dir=${profile}`,
     initialUrl,
   ], { stdio: ['ignore', 'ignore', 'pipe'] });
 
   let stderr = '';
-  child.stderr.on('data', (chunk) => { stderr += String(chunk); });
+  let resolveDevTools;
+  let rejectDevTools;
+  const devToolsReady = new Promise((resolveReady, rejectReady) => {
+    resolveDevTools = resolveReady;
+    rejectDevTools = rejectReady;
+  });
+
+  const timer = setTimeout(() => {
+    rejectDevTools(new Error('Chrome did not announce a DevTools endpoint within 10 seconds.'));
+  }, 10000);
+
+  child.stderr.on('data', (chunk) => {
+    stderr += String(chunk);
+    const match = stderr.match(/DevTools listening on ws:\/\/127\.0\.0\.1:(\d+)\/devtools\/browser\//);
+    if (match) {
+      clearTimeout(timer);
+      resolveDevTools(Number(match[1]));
+    }
+  });
+
+  child.once('exit', (code, signal) => {
+    if (!/DevTools listening on/.test(stderr)) {
+      clearTimeout(timer);
+      rejectDevTools(new Error(`Chrome exited before DevTools became ready (code=${code}, signal=${signal}).`));
+    }
+  });
+
+  let debugPort;
+  try {
+    debugPort = await devToolsReady;
+  } catch (error) {
+    child.kill('SIGKILL');
+    throw new Error(`${error instanceof Error ? error.message : String(error)}\nChrome stderr:\n${stderr}`);
+  }
 
   let page;
   try {
-    page = await debuggerPage();
+    page = await debuggerPage(debugPort);
   } catch (error) {
     child.kill('SIGKILL');
     throw new Error(`${error instanceof Error ? error.message : String(error)}\nChrome stderr:\n${stderr}`);
@@ -131,7 +164,6 @@ async function launch(initialHash) {
   await cdp.ready();
   return { child, cdp, stderr: () => stderr };
 }
-
 async function evaluate(cdp, expression) {
   const result = await cdp.send('Runtime.evaluate', {
     expression,
