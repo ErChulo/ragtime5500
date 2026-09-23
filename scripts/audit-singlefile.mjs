@@ -36,7 +36,8 @@ const scriptPattern = new RegExp(`<script\\b[^>]*\\btype=["']module["'][^>]*\\bn
 
 if (!stylePattern.test(html)) violations.push('compiled CSS is not inlined with the required CSP nonce');
 if (!scriptPattern.test(html)) violations.push('compiled JavaScript is not inlined with the required CSP nonce');
-if (danglingWorkerPattern.test(html)) violations.push('compiled JavaScript still contains a relative runtime asset URL');
+const danglingMatch = html.match(danglingWorkerPattern);
+if (danglingMatch) violations.push(`compiled JavaScript still contains a relative runtime asset URL: ${danglingMatch[0]}`);
 if (/<script\b[^>]*\bsrc\s*=/i.test(shell)) violations.push('HTML shell still references an external script asset');
 if (/<link\b[^>]*\bhref\s*=/i.test(shell)) violations.push('HTML shell still references an external link asset');
 if (/<(?:img|source|audio|video|iframe)\b[^>]*\bsrc\s*=\s*["'](?!data:|blob:|#)/i.test(shell)) {
