@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { readStoredFile } from '../ingest/opfsFiles';
 import { provenanceUrlText } from '../security/externalUrl';
+import { renderPdfPage } from '../pdf/renderPage';
 
 interface Props {
   row: Record<string, unknown>;
@@ -19,7 +20,6 @@ export function ProvenanceCard({ row }: Props) {
     void (async () => {
       try {
         const bytes = await readStoredFile(storageKey);
-        const { renderPdfPage } = await import('../pdf/renderPage');
         if (!canvasRef.current) return;
         await renderPdfPage(bytes, page, canvasRef.current);
       } catch (cause) {
