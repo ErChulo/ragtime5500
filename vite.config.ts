@@ -44,12 +44,16 @@ function sourceBytes(source: string | Uint8Array): Buffer {
   return typeof source === 'string' ? Buffer.from(source, 'utf8') : Buffer.from(source);
 }
 
-function replaceAssetReference(source: string, fileName: string, dataUri: string): string {
+function replaceBundleReference(source: string, fileName: string, replacement: string): string {
   const escaped = escapeRegExp(fileName);
   return source
-    .replace(new RegExp(`(["'])\\./${escaped}\\1`, 'g'), (_match, quote) => `${quote}${dataUri}${quote}`)
-    .replace(new RegExp(`(["'])/${escaped}\\1`, 'g'), (_match, quote) => `${quote}${dataUri}${quote}`)
-    .replace(new RegExp(`(["'])${escaped}\\1`, 'g'), (_match, quote) => `${quote}${dataUri}${quote}`);
+    .replace(new RegExp(`(["'])\\./${escaped}\\1`, 'g'), (_match, quote) => `${quote}${replacement}${quote}`)
+    .replace(new RegExp(`(["'])/${escaped}\\1`, 'g'), (_match, quote) => `${quote}${replacement}${quote}`)
+    .replace(new RegExp(`(["'])${escaped}\\1`, 'g'), (_match, quote) => `${quote}${replacement}${quote}`);
+}
+
+function dataUri(mime: string, bytes: Buffer): string {
+  return `data:${mime};base64,${bytes.toString('base64')}`;
 }
 
 function singleHtmlBundle(): Plugin {
@@ -64,61 +68,92 @@ function singleHtmlBundle(): Plugin {
       const htmlAsset = bundle[htmlKey];
       if (htmlAsset.type !== 'asset') throw new Error('HTML entry was not emitted as an asset.');
 
+      const entryNames = Object.entries(bundle)
+        .filter(([, output]) => output.type === 'chunk' && output.isEntry)
+        .map(([fileName]) => fileName);
+      if (entryNames.length !== 1) {
+        throw new Error(`Standalone build requires exactly one application entry chunk; found ${entryNames.length}.`);
+      }
+      const entryName = entryNames[0];
+      const entryChunk = bundle[entryName];
+      if (entryChunk.type !== 'chunk') throw new Error('Application entry was not emitted as a JavaScript chunk.');
+
       let html = String(htmlAsset.source);
       const styles: string[] = [];
-      const scripts: string[] = [];
-
-      const embeddedAssets = new Map<string, string>();
-      for (const [fileName, output] of Object.entries(bundle)) {
-        if (fileName === htmlKey || output.type !== 'asset' || fileName.endsWith('.css')) continue;
-        const base64 = sourceBytes(output.source).toString('base64');
-        embeddedAssets.set(fileName, `data:${mimeType(fileName)};base64,${base64}`);
-      }
-
-      for (const output of Object.values(bundle)) {
-        if (output.type !== 'chunk') continue;
-        for (const [fileName, dataUri] of embeddedAssets) {
-          output.code = replaceAssetReference(output.code, fileName, dataUri);
-        }
-      }
-      for (const [fileName, dataUri] of embeddedAssets) {
-        html = replaceAssetReference(html, fileName, dataUri);
-        delete bundle[fileName];
-      }
+      const assetUris = new Map<string, string>();
 
       for (const [fileName, output] of Object.entries(bundle)) {
-        if (fileName === htmlKey) continue;
-
-        if (output.type === 'asset' && fileName.endsWith('.css')) {
+        if (fileName === htmlKey || output.type !== 'asset') continue;
+        if (fileName.endsWith('.css')) {
           styles.push(String(output.source));
           html = html.replace(
             new RegExp(`<link\\b[^>]*\\bhref=["'][^"']*${escapeRegExp(fileName)}["'][^>]*>`, 'g'),
             '',
           );
-          delete bundle[fileName];
           continue;
         }
+        assetUris.set(fileName, dataUri(mimeType(fileName), sourceBytes(output.source)));
+      }
 
-        if (output.type === 'chunk') {
-          if (!output.isEntry) {
-            throw new Error(`Standalone build emitted an unexpected JavaScript chunk: ${fileName}`);
-          }
-          scripts.push(output.code);
-          html = html.replace(
-            new RegExp(`<script\\b[^>]*\\bsrc=["'][^"']*${escapeRegExp(fileName)}["'][^>]*>\\s*</script>`, 'g'),
-            '',
-          );
-          delete bundle[fileName];
+      const chunkUriCache = new Map<string, string>();
+      const building = new Set<string>();
+
+      const buildChunkUri = (fileName: string): string => {
+        const cached = chunkUriCache.get(fileName);
+        if (cached) return cached;
+        if (building.has(fileName)) {
+          throw new Error(`Standalone dynamic chunk cycle is not supported: ${[...building, fileName].join(' -> ')}`);
         }
+
+        const output = bundle[fileName];
+        if (!output || output.type !== 'chunk') {
+          throw new Error(`Expected JavaScript chunk ${fileName} while embedding the standalone build.`);
+        }
+
+        building.add(fileName);
+        let code = output.code;
+
+        for (const [assetName, uri] of assetUris) {
+          code = replaceBundleReference(code, assetName, uri);
+        }
+
+        const dependencies = [...new Set([...output.imports, ...output.dynamicImports])];
+        for (const dependency of dependencies) {
+          if (dependency === entryName) {
+            throw new Error(`Standalone chunk ${fileName} imports the application entry, which cannot be encoded safely.`);
+          }
+          const dependencyOutput = bundle[dependency];
+          if (!dependencyOutput || dependencyOutput.type !== 'chunk') continue;
+          const dependencyUri = buildChunkUri(dependency);
+          code = replaceBundleReference(code, dependency, dependencyUri);
+        }
+
+        building.delete(fileName);
+        const uri = dataUri('text/javascript', Buffer.from(code, 'utf8'));
+        chunkUriCache.set(fileName, uri);
+        return uri;
+      };
+
+      let entryCode = entryChunk.code;
+      for (const [assetName, uri] of assetUris) {
+        entryCode = replaceBundleReference(entryCode, assetName, uri);
+        html = replaceBundleReference(html, assetName, uri);
       }
 
-      const leftovers = Object.keys(bundle).filter((fileName) => fileName !== htmlKey);
-      if (leftovers.length) {
-        throw new Error(`Standalone build emitted external assets: ${leftovers.join(', ')}`);
+      const entryDependencies = [...new Set([...entryChunk.imports, ...entryChunk.dynamicImports])];
+      for (const dependency of entryDependencies) {
+        const dependencyOutput = bundle[dependency];
+        if (!dependencyOutput || dependencyOutput.type !== 'chunk') continue;
+        entryCode = replaceBundleReference(entryCode, dependency, buildChunkUri(dependency));
       }
+
+      html = html.replace(
+        new RegExp(`<script\\b[^>]*\\bsrc=["'][^"']*${escapeRegExp(entryName)}["'][^>]*>\\s*</script>`, 'g'),
+        '',
+      );
 
       const styleText = styles.join('\n').replace(/<\/style/gi, '<\\/style');
-      const scriptText = scripts.join('\n').replace(/<\/script/gi, '<\\/script');
+      const scriptText = entryCode.replace(/<\/script/gi, '<\\/script');
       if (!styleText || !scriptText) throw new Error('Standalone build is missing inlined CSS or JavaScript.');
 
       const scriptDirective = "script-src 'self' 'wasm-unsafe-eval'";
@@ -128,17 +163,25 @@ function singleHtmlBundle(): Plugin {
       }
 
       html = html
-        .replace(scriptDirective, `${scriptDirective} 'nonce-${INLINE_NONCE}'`)
+        .replace(scriptDirective, `${scriptDirective} data: 'nonce-${INLINE_NONCE}'`)
         .replace(styleDirective, `${styleDirective} 'nonce-${INLINE_NONCE}'`)
         .replace('</head>', `<style nonce="${INLINE_NONCE}">${styleText}</style>\n  </head>`)
         .replace('</body>', `<script type="module" nonce="${INLINE_NONCE}">${scriptText}</script>\n  </body>`);
 
-      htmlAsset.source = html;
+      for (const fileName of Object.keys(bundle)) {
+        if (fileName !== htmlKey) delete bundle[fileName];
+      }
 
+      htmlAsset.source = html;
       if (htmlKey !== FINAL_HTML) {
         delete bundle[htmlKey];
         htmlAsset.fileName = FINAL_HTML;
         bundle[FINAL_HTML] = htmlAsset;
+      }
+
+      const leftovers = Object.keys(bundle);
+      if (leftovers.length !== 1 || leftovers[0] !== FINAL_HTML) {
+        throw new Error(`Standalone build must contain exactly ${FINAL_HTML}; found ${leftovers.join(', ')}.`);
       }
     },
   };
@@ -172,10 +215,5 @@ export default defineConfig({
     sourcemap: false,
     cssCodeSplit: false,
     assetsInlineLimit: Number.MAX_SAFE_INTEGER,
-    rollupOptions: {
-      output: {
-        inlineDynamicImports: true,
-      },
-    },
   },
 });
