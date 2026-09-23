@@ -390,7 +390,8 @@ async function secondRun() {
       throw new Error(`Outbound HTTP(S) requests detected during second file-protocol run: ${externalRequests.join(', ')}`);
     }
   } catch (error) {
-    throw new Error(`${error instanceof Error ? error.message : String(error)}\nChrome stderr:\n${session.stderr()}`);
+    const snapshot = await evaluate(session.cdp, `JSON.stringify({ href: location.href, title: document.title, text: document.body?.innerText?.slice(0, 5000) ?? '', html: document.documentElement?.outerHTML?.slice(0, 2500) ?? '' })`).catch(() => 'browser snapshot unavailable');
+    throw new Error(`${error instanceof Error ? error.message : String(error)}\nBrowser snapshot:\n${snapshot}\nBrowser messages:\n${browserMessages.join('\n')}\nChrome stderr:\n${session.stderr()}`);
   } finally {
     await closeChrome(session);
   }
