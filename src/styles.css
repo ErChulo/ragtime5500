@@ -537,3 +537,40 @@ button.button-tertiary:hover:not(:disabled) {
 }
 .provenance-url { max-width: 360px; }
 .import-results { margin-top: .9rem; }
+
+
+.diagnostic-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(120px, 1fr));
+  gap: .65rem;
+  margin: .95rem 0 0;
+}
+.diagnostic-grid > div {
+  min-width: 0;
+  padding: .72rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: rgba(8, 13, 19, .54);
+}
+.diagnostic-grid dt {
+  margin-bottom: .3rem;
+  color: var(--muted);
+  font-size: .72rem;
+}
+.diagnostic-grid dd {
+  margin: 0;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.diagnostic-table,
+.audit-table { margin-top: .9rem; }
+.audit-table td:nth-child(5),
+.audit-table td:nth-child(6) { max-width: 28rem; }
+.database-tools > .panel { margin-bottom: 1rem; }
+
+@media (max-width: 900px) {
+  .diagnostic-grid { grid-template-columns: repeat(2, minmax(120px, 1fr)); }
+}
+@media (max-width: 520px) {
+  .diagnostic-grid { grid-template-columns: 1fr; }
+}
