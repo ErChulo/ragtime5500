@@ -1,5 +1,7 @@
 name: Milestone 1 verification
 
+# Development-only verification; Ragtime 5500 runtime remains fully local.
+
 on:
   push:
     branches: [main]
