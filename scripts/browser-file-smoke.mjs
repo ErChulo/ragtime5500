@@ -282,7 +282,7 @@ async function firstRun() {
   } catch (error) {
     const snapshot = await evaluate(session.cdp, `JSON.stringify({ href: location.href, title: document.title, text: document.body?.innerText?.slice(0, 4000) ?? '', html: document.documentElement?.outerHTML?.slice(0, 4000) ?? '' })`).catch(() => 'browser snapshot unavailable');
     const exception = browserMessages.find((message) => message.startsWith('EXCEPTION @ '));
-    const locationMatch = exception?.match(/EXCEPTION @ (\\d+):(\\d+):/);
+    const locationMatch = exception?.match(/EXCEPTION @ (\d+):(\d+):/);
     const snippet = locationMatch ? await sourceSnippet(Number(locationMatch[1]), Number(locationMatch[2])) : 'no exception location available';
     throw new Error(`${error instanceof Error ? error.message : String(error)}\nBrowser snapshot:\n${snapshot}\nBrowser messages:\n${browserMessages.join('\n')}\nCompiled source snippet:\n${snippet}\nChrome stderr:\n${session.stderr()}`);
   } finally {
