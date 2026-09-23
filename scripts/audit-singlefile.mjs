@@ -4,6 +4,7 @@ import { join, relative } from 'node:path';
 const ROOT = new URL('../', import.meta.url).pathname;
 const DIST = join(ROOT, 'dist');
 const TARGET = 'ragtime5500.html';
+const NONCE = 'ragtime5500-local-runtime-v1';
 
 async function filesUnder(dir) {
   const out = [];
@@ -25,19 +26,22 @@ if (relativeFiles.length !== 1 || relativeFiles[0] !== TARGET) {
 
 const html = await readFile(join(DIST, TARGET), 'utf8');
 const shell = html
-  .replace(/<style>[\s\S]*?<\/style>/i, '<style></style>')
-  .replace(/<script\s+type=["']module["']>[\s\S]*?<\/script>/i, '<script type="module"></script>');
+  .replace(/<style\b[^>]*>[\s\S]*?<\/style>/i, '<style></style>')
+  .replace(/<script\b[^>]*\btype=["']module["'][^>]*>[\s\S]*?<\/script>/i, '<script type="module"></script>');
 
-if (!/<style\\b[^>]*\\bnonce=["']ragtime5500-local-runtime-v1["'][^>]*>[\\s\\S]+<\\/style>/i.test(html)) violations.push('compiled CSS is not inlined with the required CSP nonce');
-if (!/<script\s+type=["']module["']>[\s\S]+<\/script>/i.test(html)) violations.push('compiled JavaScript is not inlined');
+const stylePattern = new RegExp(`<style\\b[^>]*\\bnonce=["']${NONCE}["'][^>]*>[\\s\\S]+<\\/style>`, 'i');
+const scriptPattern = new RegExp(`<script\\b[^>]*\\btype=["']module["'][^>]*\\bnonce=["']${NONCE}["'][^>]*>[\\s\\S]+<\\/script>`, 'i');
+
+if (!stylePattern.test(html)) violations.push('compiled CSS is not inlined with the required CSP nonce');
+if (!scriptPattern.test(html)) violations.push('compiled JavaScript is not inlined with the required CSP nonce');
 if (/<script\b[^>]*\bsrc\s*=/i.test(shell)) violations.push('HTML shell still references an external script asset');
 if (/<link\b[^>]*\bhref\s*=/i.test(shell)) violations.push('HTML shell still references an external link asset');
 if (/<(?:img|source|audio|video|iframe)\b[^>]*\bsrc\s*=\s*["'](?!data:|blob:|#)/i.test(shell)) {
   violations.push('HTML shell still references a non-embedded media asset');
 }
 if (!/connect-src\s+'none'/.test(html)) violations.push("compiled CSP is missing connect-src 'none'");
-if (!/script-src[^;]*'nonce-ragtime5500-local-runtime-v1'/.test(html)) violations.push('compiled CSP is missing the inline script nonce');
-if (!/style-src[^;]*'nonce-ragtime5500-local-runtime-v1'/.test(html)) violations.push('compiled CSP is missing the inline style nonce');
+if (!new RegExp(`script-src[^;]*'nonce-${NONCE}'`).test(html)) violations.push('compiled CSP is missing the inline script nonce');
+if (!new RegExp(`style-src[^;]*'nonce-${NONCE}'`).test(html)) violations.push('compiled CSP is missing the inline style nonce');
 if (!/worker-src\s+'self'\s+blob:\s+data:/.test(html)) violations.push('compiled CSP does not allow only embedded worker transports');
 
 if (violations.length) {
