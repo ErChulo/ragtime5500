@@ -98,7 +98,7 @@ async function openDatabase(): Promise<void> {
       directory: '.ragtime5500-sahpool',
       initialCapacity: 8,
     });
-    await pool.reserveMinimumCapacity(8);
+    await pool.reserveMinimumCapacity();
   }
 
   if (!db) {
