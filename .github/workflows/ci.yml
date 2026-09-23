@@ -29,6 +29,17 @@ jobs:
       - name: Run complete source check
         run: npm run check
 
+      - name: Record standalone artifact checksum
+        run: sha256sum dist/ragtime5500.html
+
+      - name: Upload standalone HTML
+        uses: actions/upload-artifact@v4
+        with:
+          name: ragtime5500-standalone
+          path: dist/ragtime5500.html
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Explain CI boundary
         if: always()
         run: |
