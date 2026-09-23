@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { storeLocalFile } from '../ingest/opfsFiles';
 import { extractScheduleH1c9 } from '../pdf/scheduleH1c9';
+import { extractPdfPages } from '../pdf/extractText';
 import { chooseMatch, inferDocumentSignals } from '../matching/matchPdf';
 import {
   ensureSourceDocument,
