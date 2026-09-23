@@ -1,0 +1,44 @@
+# Dependencies and build output
+node_modules/
+dist/
+.tmp-test/
+coverage/
+*.log
+.DS_Store
+
+# Local environment / editor state
+.env
+.env.*
+!.env.example
+.vscode/
+.idea/
+
+# Case data and imports — never commit pension case material
+case-data/
+imports/
+local-data/
+backups/
+exports/
+*.pdf
+*.csv
+!tests/fixtures/**/*.csv
+*.sqlite
+*.sqlite3
+*.db
+*.db3
+*.sqlite-journal
+*.sqlite-wal
+*.sqlite-shm
+
+# Browser profiles / OPFS test artifacts
+browser-data/
+opfs-data/
+playwright-report/
+test-results/
+
+# Optional local model artifacts
+*.onnx
+*.ort
+*.safetensors
+*.gguf
+models/

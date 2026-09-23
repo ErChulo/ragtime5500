@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "lib": ["ES2022", "DOM"],
+    "rootDir": ".",
+    "outDir": ".tmp-test",
+    "noEmit": false
+  },
+  "include": [
+    "src/types/domain.ts",
+    "src/ingest/csv.ts",
+    "src/ingest/efast.ts",
+    "src/matching/matchPdf.ts",
+    "src/pdf/scheduleH1c9.ts"
+  ]
+}
