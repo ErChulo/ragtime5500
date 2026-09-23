@@ -27,6 +27,7 @@ function inlineSqliteWasm(): Plugin {
 export default defineConfig({
   plugins: [react(), inlineSqliteWasm()],
   worker: {
+    format: 'es',
     plugins: () => [inlineSqliteWasm()],
   },
   server: {
