@@ -187,4 +187,169 @@ export async function savePdfImport(
   return { filingId: result[0]?.filing_id ?? null, matchStatus: match.status };
 }
 
-export async function saveExtractedValues(filingId: number, planYear: number, values: Extracted
+export async function saveExtractedValues(filingId: number, planYear: number, values: Extracted5500Value[]): Promise<void> {
+  const statements: Array<{ sql: string; bind?: (string | number | null)[] }> = [];
+  for (const value of values) {
+    statements.push({
+      sql: `INSERT INTO filing_value(
+              filing_id,line_definition_id,raw_value,normalized_number,extraction_method,
+              extraction_confidence,verification_status,source_page,source_text
+            )
+            SELECT ?, ld.line_definition_id, ?, ?, ?, ?, ?, ?, ?
+            FROM line_definition ld
+            JOIN form_definition fd ON fd.form_definition_id=ld.form_definition_id
+            WHERE fd.form_year=? AND ld.schedule_name=? AND ld.part=?
+              AND ld.location_reference=? AND ld.subfield=?
+            ON CONFLICT(filing_id,line_definition_id) DO UPDATE SET
+              raw_value=excluded.raw_value,
+              normalized_number=excluded.normalized_number,
+              extraction_method=excluded.extraction_method,
+              extraction_confidence=excluded.extraction_confidence,
+              source_page=excluded.source_page,
+              source_text=excluded.source_text,
+              updated_at=CURRENT_TIMESTAMP
+            WHERE filing_value.verification_status='EXTRACTED_UNVERIFIED'`,
+      bind: [
+        filingId, value.rawValue, value.normalizedNumber, value.extractionMethod,
+        value.confidence, value.verificationStatus, value.sourcePage, value.sourceText,
+        planYear, value.schedule, value.part, value.locationReference, value.subfield,
+      ],
+    });
+  }
+  if (values.length) {
+    statements.push({
+      sql: `UPDATE filing SET filing_status='PARSED' WHERE filing_id=? AND filing_status IN ('EXPECTED','MATCHED')`,
+      bind: [filingId],
+    });
+  }
+  await db.transaction(statements);
+}
+
+export async function verifyValue(filingValueId: number): Promise<void> {
+  await db.transaction([
+    {
+      sql: `INSERT INTO audit_log(entity_type,entity_id,action,old_value,new_value)
+            SELECT 'FILING_VALUE', filing_value_id, 'VERIFY', verification_status, 'USER_VERIFIED'
+            FROM filing_value WHERE filing_value_id=?`,
+      bind: [filingValueId],
+    },
+    {
+      sql: `UPDATE filing_value SET verification_status='USER_VERIFIED',updated_at=CURRENT_TIMESTAMP
+            WHERE filing_value_id=?`,
+      bind: [filingValueId],
+    },
+  ]);
+}
+
+export async function correctNumericValue(filingValueId: number, newValue: number, reason: string): Promise<void> {
+  await db.transaction([
+    {
+      sql: `INSERT INTO filing_value_revision(
+              filing_value_id,revision_reason,raw_value,normalized_text,normalized_number,normalized_date,
+              extraction_method,extraction_confidence,verification_status,source_page,source_text
+            )
+            SELECT filing_value_id,?,raw_value,normalized_text,normalized_number,normalized_date,
+                   extraction_method,extraction_confidence,verification_status,source_page,source_text
+            FROM filing_value WHERE filing_value_id=?`,
+      bind: [reason, filingValueId],
+    },
+    {
+      sql: `INSERT INTO audit_log(entity_type,entity_id,action,old_value,new_value)
+            SELECT 'FILING_VALUE',filing_value_id,'CORRECT',CAST(normalized_number AS TEXT),?
+            FROM filing_value WHERE filing_value_id=?`,
+      bind: [String(newValue), filingValueId],
+    },
+    {
+      sql: `UPDATE filing_value SET raw_value=?,normalized_number=?,verification_status='USER_CORRECTED',updated_at=CURRENT_TIMESTAMP
+            WHERE filing_value_id=?`,
+      bind: [String(newValue), newValue, filingValueId],
+    },
+  ]);
+}
+
+export async function listCases(): Promise<Array<Record<string, unknown>>> {
+  return db.exec('SELECT case_id,case_name,notes FROM pension_case ORDER BY case_name');
+}
+
+export async function createCase(caseName: string, notes: string | null = null): Promise<void> {
+  await db.exec('INSERT INTO pension_case(case_name,notes) VALUES(?,?)', [caseName, notes]);
+}
+
+export async function queryValue(filters: {
+  year: number; schedule?: string; part?: string; location?: string; subfield?: string; canonicalConcept?: string;
+}): Promise<Array<Record<string, unknown>>> {
+  const clauses = ['plan_year=?'];
+  const bind: (string | number)[] = [filters.year];
+  if (filters.schedule) { clauses.push('schedule_name=?'); bind.push(filters.schedule); }
+  if (filters.part) { clauses.push('part=?'); bind.push(filters.part); }
+  if (filters.location) { clauses.push('location_reference=?'); bind.push(filters.location); }
+  if (filters.subfield) { clauses.push('subfield=?'); bind.push(filters.subfield); }
+  if (filters.canonicalConcept) { clauses.push('canonical_concept=?'); bind.push(filters.canonicalConcept); }
+  return db.exec(`SELECT * FROM filing_value_provenance WHERE ${clauses.join(' AND ')} ORDER BY schedule_name,location_reference,subfield`, bind);
+}
+
+export async function getFilingContext(filingId: number): Promise<{ planYear: number; sourceDocumentId: number | null }> {
+  const rows = await db.exec<{ planYear: number; sourceDocumentId: number | null }>(
+    `SELECT py.year AS planYear, f.source_document_id AS sourceDocumentId
+     FROM filing f JOIN plan_year py ON py.plan_year_id=f.plan_year_id WHERE f.filing_id=?`, [filingId],
+  );
+  if (!rows[0]) throw new Error('Filing not found.');
+  return rows[0];
+}
+
+export async function listPlans(caseId: number): Promise<Array<Record<string, unknown>>> {
+  return db.exec('SELECT plan_id,plan_name,plan_number,sponsor_ein,sponsor_name FROM plan WHERE case_id=? ORDER BY plan_name', [caseId]);
+}
+
+export async function createPlan(caseId: number, planName: string, planNumber: string | null): Promise<void> {
+  await db.exec('INSERT INTO plan(case_id,plan_name,plan_number) VALUES(?,?,?)', [caseId, planName, planNumber]);
+}
+
+export async function updatePlan(planId: number, planName: string, planNumber: string | null): Promise<void> {
+  await db.exec('UPDATE plan SET plan_name=?,plan_number=?,updated_at=CURRENT_TIMESTAMP WHERE plan_id=?', [planName, planNumber, planId]);
+}
+
+export async function deletePlan(planId: number): Promise<void> {
+  await db.exec('DELETE FROM plan WHERE plan_id=?', [planId]);
+}
+
+export async function listPlanYears(planId: number): Promise<Array<Record<string, unknown>>> {
+  return db.exec('SELECT plan_year_id,year,period_begin,period_end FROM plan_year WHERE plan_id=? ORDER BY year DESC', [planId]);
+}
+
+export async function createPlanYear(planId: number, year: number, periodBegin: string | null, periodEnd: string | null): Promise<void> {
+  await db.exec('INSERT INTO plan_year(plan_id,year,period_begin,period_end) VALUES(?,?,?,?)', [planId, year, periodBegin, periodEnd]);
+}
+
+export async function updatePlanYear(planYearId: number, year: number, periodBegin: string | null, periodEnd: string | null): Promise<void> {
+  await db.exec('UPDATE plan_year SET year=?,period_begin=?,period_end=?,updated_at=CURRENT_TIMESTAMP WHERE plan_year_id=?', [year, periodBegin, periodEnd, planYearId]);
+}
+
+export async function deletePlanYear(planYearId: number): Promise<void> {
+  await db.exec('DELETE FROM plan_year WHERE plan_year_id=?', [planYearId]);
+}
+
+export async function listFilings(planYearId: number): Promise<Array<Record<string, unknown>>> {
+  return db.exec(`SELECT filing_id,filing_type,filing_date,efast_filing_id,source_url,amended_flag,filing_status
+                  FROM filing WHERE plan_year_id=? ORDER BY filing_date DESC, filing_id DESC`, [planYearId]);
+}
+
+export async function createFiling(planYearId: number, filingType: string, filingDate: string | null): Promise<void> {
+  await db.exec('INSERT INTO filing(plan_year_id,filing_type,filing_date) VALUES(?,?,?)', [planYearId, filingType, filingDate]);
+}
+
+export async function updateFiling(filingId: number, filingType: string, filingDate: string | null): Promise<void> {
+  await db.exec('UPDATE filing SET filing_type=?,filing_date=? WHERE filing_id=?', [filingType, filingDate, filingId]);
+}
+
+export async function deleteFiling(filingId: number): Promise<void> {
+  await db.exec('DELETE FROM filing WHERE filing_id=?', [filingId]);
+}
+
+export async function listDocumentMatches(): Promise<Array<Record<string, unknown>>> {
+  return db.exec(`
+    SELECT dm.document_match_id, dm.verification_status, dm.match_score, dm.evidence_json,
+           sd.filename, sd.sha256, er.plan_year, er.plan_number, er.plan_name, er.source_url
+    FROM document_match dm
+    JOIN source_document sd ON sd.source_document_id=dm.source_document_id
+    LEFT JOIN efast_import_row e
