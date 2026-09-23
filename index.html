@@ -5,12 +5,36 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; connect-src 'none'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self'; img-src 'self' data: blob:; font-src 'self'; worker-src 'self' blob: data:; media-src 'self' blob:; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none';"
+      content="default-src 'self'; connect-src 'none'; script-src 'self' 'wasm-unsafe-eval' 'nonce-ragtime5500-local-runtime-v1'; style-src 'self'; img-src 'self' data: blob:; font-src 'self'; worker-src 'self' blob: data:; media-src 'self' blob:; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none';"
     />
     <title>Ragtime 5500 — Offline Form 5500 Workbench</title>
   </head>
   <body>
     <div id="root"></div>
+    <script nonce="ragtime5500-local-runtime-v1">
+      (() => {
+        const blocked = (name) => () => {
+          throw new Error(`Network capability disabled by Ragtime 5500 security policy: ${name}`);
+        };
+        const g = globalThis;
+        for (const name of ['fetch', 'XMLHttpRequest', 'WebSocket', 'EventSource', 'open']) {
+          try {
+            Object.defineProperty(g, name, {
+              configurable: false,
+              writable: false,
+              value: blocked(name),
+            });
+          } catch {}
+        }
+        try {
+          Object.defineProperty(navigator, 'sendBeacon', {
+            configurable: false,
+            writable: false,
+            value: blocked('navigator.sendBeacon'),
+          });
+        } catch {}
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
