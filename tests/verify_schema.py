@@ -42,6 +42,17 @@ def main() -> None:
         seed(conn)
         fk = conn.execute('PRAGMA foreign_key_check').fetchall()
         assert fk == [], fk
+        # PARTIAL UNIQUE UPSERT: mirrors the eFAST filing insertion contract.
+        plan_year_id = conn.execute("SELECT plan_year_id FROM plan_year WHERE year=2024 LIMIT 1").fetchone()[0]
+        conn.execute("""INSERT INTO filing(plan_year_id,filing_date,efast_filing_id,source_url,filing_status)
+                        VALUES(?, '2026-01-01', 'SYNTHETIC-EFAST-ID', 'https://example.invalid/a.pdf', 'EXPECTED')""", (plan_year_id,))
+        conn.execute("""INSERT INTO filing(plan_year_id,filing_date,efast_filing_id,source_url,filing_status)
+                        VALUES(?, '2026-02-02', 'SYNTHETIC-EFAST-ID', 'https://example.invalid/b.pdf', 'EXPECTED')
+                        ON CONFLICT(efast_filing_id) WHERE efast_filing_id IS NOT NULL DO UPDATE SET
+                          filing_date=excluded.filing_date, source_url=excluded.source_url""", (plan_year_id,))
+        upserted = conn.execute("SELECT filing_date,source_url FROM filing WHERE efast_filing_id='SYNTHETIC-EFAST-ID'").fetchone()
+        assert upserted == ('2026-02-02', 'https://example.invalid/b.pdf'), upserted
+
         fts = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='document_chunk_fts'").fetchone()
         assert fts is not None
         doc_id = conn.execute("SELECT source_document_id FROM source_document LIMIT 1").fetchone()[0]
