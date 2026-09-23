@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { searchDocumentText } from '../db/repository';
 import { readStoredFile } from '../ingest/opfsFiles';
-import { renderPdfPage } from '../pdf/renderPage';
 
 function EvidencePage({ row }: { row: Record<string, unknown> }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -14,6 +13,7 @@ function EvidencePage({ row }: { row: Record<string, unknown> }) {
     const run = async () => {
       try {
         const bytes = await readStoredFile(String(row.storage_key ?? ''));
+        const { renderPdfPage } = await import('../pdf/renderPage');
         if (!active || !canvasRef.current) return;
         await renderPdfPage(bytes, Number(row.page_number), canvasRef.current);
       } catch (cause) {
