@@ -352,4 +352,29 @@ export async function listDocumentMatches(): Promise<Array<Record<string, unknow
            sd.filename, sd.sha256, er.plan_year, er.plan_number, er.plan_name, er.source_url
     FROM document_match dm
     JOIN source_document sd ON sd.source_document_id=dm.source_document_id
-    LEFT JOIN efast_import_row e
+    LEFT JOIN efast_import_row er ON er.import_row_id=dm.import_row_id
+    ORDER BY dm.document_match_id DESC
+  `);
+}
+
+export async function listExtractionReview(): Promise<Array<Record<string, unknown>>> {
+  return db.exec(`
+    SELECT * FROM filing_value_provenance
+    ORDER BY CASE verification_status WHEN 'EXTRACTED_UNVERIFIED' THEN 0 ELSE 1 END,
+             plan_year DESC, schedule_name, location_reference, subfield
+  `);
+}
+
+export async function deleteFilingValue(filingValueId: number): Promise<void> {
+  await db.transaction([
+    {
+      sql: `INSERT INTO audit_log(entity_type,entity_id,action,old_value,new_value)
+            SELECT 'FILING_VALUE',filing_value_id,'DELETE',
+                   json_object('raw_value',raw_value,'normalized_number',normalized_number,'status',verification_status),
+                   NULL
+            FROM filing_value WHERE filing_value_id=?`,
+      bind: [filingValueId],
+    },
+    { sql: 'DELETE FROM filing_value WHERE filing_value_id=?', bind: [filingValueId] },
+  ]);
+}
