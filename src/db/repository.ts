@@ -671,3 +671,83 @@ export async function queryCanonicalHistory(
     [concept],
   );
 }
+
+
+export async function getDatabaseHealth(): Promise<{
+  quickCheck: string;
+  foreignKeyViolations: number;
+  migrationVersion: number;
+  caseCount: number;
+  planCount: number;
+  filingCount: number;
+  sourceDocumentCount: number;
+  filingValueCount: number;
+}> {
+  const [
+    quickRows,
+    fkRows,
+    migrationRows,
+    countRows,
+  ] = await Promise.all([
+    db.exec<{ quick_check: string }>('PRAGMA quick_check'),
+    db.exec<Record<string, unknown>>('PRAGMA foreign_key_check'),
+    db.exec<{ version: number }>('SELECT COALESCE(MAX(version),0) AS version FROM schema_migration'),
+    db.exec<{
+      case_count: number;
+      plan_count: number;
+      filing_count: number;
+      source_document_count: number;
+      filing_value_count: number;
+    }>(`SELECT
+          (SELECT COUNT(*) FROM pension_case) AS case_count,
+          (SELECT COUNT(*) FROM plan) AS plan_count,
+          (SELECT COUNT(*) FROM filing) AS filing_count,
+          (SELECT COUNT(*) FROM source_document) AS source_document_count,
+          (SELECT COUNT(*) FROM filing_value) AS filing_value_count`),
+  ]);
+
+  const counts = countRows[0];
+  return {
+    quickCheck: quickRows[0]?.quick_check ?? 'unknown',
+    foreignKeyViolations: fkRows.length,
+    migrationVersion: migrationRows[0]?.version ?? 0,
+    caseCount: counts?.case_count ?? 0,
+    planCount: counts?.plan_count ?? 0,
+    filingCount: counts?.filing_count ?? 0,
+    sourceDocumentCount: counts?.source_document_count ?? 0,
+    filingValueCount: counts?.filing_value_count ?? 0,
+  };
+}
+
+export async function listSourceDocumentsForIntegrity(): Promise<Array<{
+  sourceDocumentId: number;
+  filename: string;
+  storageKey: string;
+  sha256: string;
+  fileSize: number;
+  sourceType: string;
+}>> {
+  const rows = await db.exec<Record<string, unknown>>(`
+    SELECT source_document_id, filename, storage_key, sha256, file_size, source_type
+    FROM source_document
+    ORDER BY source_document_id
+  `);
+  return rows.map((row) => ({
+    sourceDocumentId: Number(row.source_document_id),
+    filename: String(row.filename),
+    storageKey: String(row.storage_key),
+    sha256: String(row.sha256),
+    fileSize: Number(row.file_size),
+    sourceType: String(row.source_type),
+  }));
+}
+
+export async function listAuditLog(limit = 100): Promise<Array<Record<string, unknown>>> {
+  const safeLimit = Math.max(1, Math.min(500, Math.trunc(limit)));
+  return db.exec(`
+    SELECT audit_id, entity_type, entity_id, action, old_value, new_value, timestamp
+    FROM audit_log
+    ORDER BY audit_id DESC
+    LIMIT ?
+  `, [safeLimit]);
+}
