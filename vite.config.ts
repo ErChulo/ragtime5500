@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { defineConfig, type Plugin } from 'vite';
@@ -8,6 +7,7 @@ const require = createRequire(import.meta.url);
 const VIRTUAL_ID = 'virtual:sqlite-wasm-bytes';
 const RESOLVED_VIRTUAL_ID = '\0' + VIRTUAL_ID;
 const FINAL_HTML = 'ragtime5500.html';
+const INLINE_NONCE = 'ragtime5500-local-runtime-v1';
 
 function inlineSqliteWasm(): Plugin {
   return {
@@ -28,10 +28,6 @@ function inlineSqliteWasm(): Plugin {
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-function sha256Csp(value: string): string {
-  return `'sha256-${createHash('sha256').update(value).digest('base64')}'`;
 }
 
 function mimeType(fileName: string): string {
@@ -125,9 +121,6 @@ function singleHtmlBundle(): Plugin {
       const scriptText = scripts.join('\n').replace(/<\/script/gi, '<\\/script');
       if (!styleText || !scriptText) throw new Error('Standalone build is missing inlined CSS or JavaScript.');
 
-      const scriptHash = sha256Csp(scriptText);
-      const styleHash = sha256Csp(styleText);
-
       const scriptDirective = "script-src 'self' 'wasm-unsafe-eval'";
       const styleDirective = "style-src 'self'";
       if (!html.includes(scriptDirective) || !html.includes(styleDirective)) {
@@ -135,10 +128,10 @@ function singleHtmlBundle(): Plugin {
       }
 
       html = html
-        .replace(scriptDirective, `${scriptDirective} ${scriptHash}`)
-        .replace(styleDirective, `${styleDirective} ${styleHash}`)
-        .replace('</head>', `<style>${styleText}</style>\n  </head>`)
-        .replace('</body>', `<script type="module">${scriptText}</script>\n  </body>`);
+        .replace(scriptDirective, `${scriptDirective} 'nonce-${INLINE_NONCE}'`)
+        .replace(styleDirective, `${styleDirective} 'nonce-${INLINE_NONCE}'`)
+        .replace('</head>', `<style nonce="${INLINE_NONCE}">${styleText}</style>\n  </head>`)
+        .replace('</body>', `<script type="module" nonce="${INLINE_NONCE}">${scriptText}</script>\n  </body>`);
 
       htmlAsset.source = html;
 
