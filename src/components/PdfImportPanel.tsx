@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { storeLocalFile } from '../ingest/opfsFiles';
-import { extractPdfPages } from '../pdf/extractText';
 import { extractScheduleH1c9 } from '../pdf/scheduleH1c9';
 import { chooseMatch, inferDocumentSignals } from '../matching/matchPdf';
 import {
@@ -31,6 +30,7 @@ export function PdfImportPanel({ onImported }: { onImported: () => void }) {
         try {
           const stored = await storeLocalFile(file, 'pdf');
           const sourceDocumentId = await ensureSourceDocument(stored, 'pdf');
+          const { extractPdfPages } = await import('../pdf/extractText');
           const pages = await extractPdfPages(stored.bytes);
           const signals = inferDocumentSignals(file.name, pages);
           const matchable = await listMatchableRows();
