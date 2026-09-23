@@ -187,6 +187,25 @@ async function waitFor(cdp, expression, description, timeoutMs = 12000) {
 
 
 
+
+async function privateFieldDiagnostics(fieldName) {
+  try {
+    const html = await readFile(htmlPath, 'utf8');
+    const needle = `#${fieldName}`;
+    const samples = [];
+    let start = 0;
+    while (samples.length < 8) {
+      const index = html.indexOf(needle, start);
+      if (index < 0) break;
+      samples.push(html.slice(Math.max(0, index - 450), index + 650));
+      start = index + needle.length;
+    }
+    return `Occurrences of ${needle}: ${(html.match(new RegExp(needle, 'g')) ?? []).length}\n${samples.join('\n---\n')}`;
+  } catch {
+    return 'private field diagnostics unavailable';
+  }
+}
+
 async function debuggerSourceSnippet(cdp, scriptId, lineNumber, columnNumber) {
   try {
     const result = await cdp.send('Debugger.getScriptSource', { scriptId });
@@ -300,7 +319,9 @@ async function firstRun() {
     const snippet = locationMatch
       ? await debuggerSourceSnippet(session.cdp, locationMatch[3], Number(locationMatch[1]), Number(locationMatch[2]))
       : 'no exception location available';
-    throw new Error(`${error instanceof Error ? error.message : String(error)}\nBrowser snapshot:\n${snapshot}\nBrowser messages:\n${browserMessages.join('\n')}\nCompiled source snippet:\n${snippet}\nChrome stderr:\n${session.stderr()}`);
+    const privateField = exception?.match(/Private field '#([^']+)'/)?.[1];
+    const fieldDiagnostics = privateField ? await privateFieldDiagnostics(privateField) : 'no private-field diagnostic requested';
+    throw new Error(`${error instanceof Error ? error.message : String(error)}\nBrowser snapshot:\n${snapshot}\nBrowser messages:\n${browserMessages.join('\n')}\nCompiled source snippet:\n${snippet}\nPrivate-field diagnostics:\n${fieldDiagnostics}\nChrome stderr:\n${session.stderr()}`);
   } finally {
     await closeChrome(session);
   }
