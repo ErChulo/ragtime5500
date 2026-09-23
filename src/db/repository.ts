@@ -348,8 +348,10 @@ export async function deleteFiling(filingId: number): Promise<void> {
 
 export async function listDocumentMatches(): Promise<Array<Record<string, unknown>>> {
   return db.exec(`
-    SELECT dm.document_match_id, dm.verification_status, dm.match_score, dm.evidence_json,
-           sd.filename, sd.sha256, er.plan_year, er.plan_number, er.plan_name, er.source_url
+    SELECT dm.document_match_id, dm.import_row_id, dm.source_document_id,
+           dm.verification_status, dm.match_score, dm.evidence_json,
+           sd.filename, sd.sha256, sd.storage_key,
+           er.plan_year, er.plan_number, er.plan_name, er.source_url
     FROM document_match dm
     JOIN source_document sd ON sd.source_document_id=dm.source_document_id
     LEFT JOIN efast_import_row er ON er.import_row_id=dm.import_row_id
@@ -377,4 +379,90 @@ export async function deleteFilingValue(filingValueId: number): Promise<void> {
     },
     { sql: 'DELETE FROM filing_value WHERE filing_value_id=?', bind: [filingValueId] },
   ]);
+}
+
+
+export interface AcceptedDocumentMatch {
+  filingId: number;
+  planYear: number;
+  storageKey: string;
+}
+
+export async function acceptDocumentMatch(documentMatchId: number, importRowId: number): Promise<AcceptedDocumentMatch> {
+  const matches = await db.exec<{
+    source_document_id: number;
+    storage_key: string;
+    verification_status: string;
+    import_row_id: number | null;
+  }>(
+    `SELECT dm.source_document_id, sd.storage_key, dm.verification_status, dm.import_row_id
+     FROM document_match dm
+     JOIN source_document sd ON sd.source_document_id=dm.source_document_id
+     WHERE dm.document_match_id=?`,
+    [documentMatchId],
+  );
+  const match = matches[0];
+  if (!match) throw new Error('Document match not found.');
+  if (!['AMBIGUOUS', 'UNMATCHED', 'USER_REJECTED'].includes(match.verification_status)) {
+    throw new Error('Only unresolved document matches can be manually assigned.');
+  }
+
+  const targets = await db.exec<{
+    filing_id: number;
+    plan_year: number;
+    current_source_document_id: number | null;
+  }>(
+    `SELECT f.filing_id, py.year AS plan_year, f.source_document_id AS current_source_document_id
+     FROM efast_import_row er
+     JOIN filing f ON f.filing_id=er.matched_filing_id
+     JOIN plan_year py ON py.plan_year_id=f.plan_year_id
+     WHERE er.import_row_id=?`,
+    [importRowId],
+  );
+  const target = targets[0];
+  if (!target) throw new Error('Expected eFAST filing row not found.');
+  if (target.current_source_document_id !== null && target.current_source_document_id !== match.source_document_id) {
+    throw new Error('That expected filing already has a different local PDF.');
+  }
+
+  await db.transaction([
+    {
+      sql: `INSERT INTO audit_log(entity_type,entity_id,action,old_value,new_value)
+            SELECT 'DOCUMENT_MATCH',document_match_id,'USER_ACCEPT',
+                   json_object('import_row_id',import_row_id,'status',verification_status,'score',match_score),
+                   json_object('import_row_id',?,'status','USER_ACCEPTED','score',1.0)
+            FROM document_match WHERE document_match_id=?`,
+      bind: [importRowId, documentMatchId],
+    },
+    {
+      sql: `UPDATE document_match
+            SET import_row_id=?, match_method='USER_REVIEW', match_score=1.0,
+                verification_status='USER_ACCEPTED',
+                evidence_json=json_set(CASE WHEN json_valid(evidence_json) THEN evidence_json ELSE '{}' END,
+                                       '$.userDecision','accepted')
+            WHERE document_match_id=?`,
+      bind: [importRowId, documentMatchId],
+    },
+    {
+      sql: `UPDATE filing
+            SET source_document_id=?, filing_status='MATCHED'
+            WHERE filing_id=(SELECT matched_filing_id FROM efast_import_row WHERE import_row_id=?)`,
+      bind: [match.source_document_id, importRowId],
+    },
+    {
+      sql: `UPDATE source_document
+            SET original_source_url=COALESCE(
+              original_source_url,
+              (SELECT source_url FROM efast_import_row WHERE import_row_id=?)
+            )
+            WHERE source_document_id=?`,
+      bind: [importRowId, match.source_document_id],
+    },
+  ]);
+
+  return {
+    filingId: target.filing_id,
+    planYear: target.plan_year,
+    storageKey: match.storage_key,
+  };
 }
