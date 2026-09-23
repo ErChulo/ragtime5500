@@ -116,6 +116,10 @@ function singleHtmlBundle(): Plugin {
 
         for (const [assetName, uri] of assetUris) {
           code = replaceBundleReference(code, assetName, uri);
+          const shortAssetName = basename(assetName);
+          if (shortAssetName !== assetName) {
+            code = replaceBundleReference(code, shortAssetName, uri);
+          }
         }
 
         const dependencies = [...new Set([...output.imports, ...output.dynamicImports])];
@@ -127,6 +131,21 @@ function singleHtmlBundle(): Plugin {
           if (!dependencyOutput || dependencyOutput.type !== 'chunk') continue;
           const dependencyUri = buildChunkUri(dependency);
           code = replaceBundleReference(code, dependency, dependencyUri);
+          const shortDependency = basename(dependency);
+          if (shortDependency !== dependency) {
+            code = replaceBundleReference(code, shortDependency, dependencyUri);
+          }
+        }
+
+        for (const [candidateName, candidateOutput] of Object.entries(bundle)) {
+          if (candidateName === fileName || candidateName === entryName || candidateOutput.type !== 'chunk') continue;
+          const shortCandidate = basename(candidateName);
+          if (!code.includes(candidateName) && !code.includes(shortCandidate)) continue;
+          const candidateUri = buildChunkUri(candidateName);
+          code = replaceBundleReference(code, candidateName, candidateUri);
+          if (shortCandidate !== candidateName) {
+            code = replaceBundleReference(code, shortCandidate, candidateUri);
+          }
         }
 
         building.delete(fileName);
@@ -139,13 +158,34 @@ function singleHtmlBundle(): Plugin {
       for (const [assetName, uri] of assetUris) {
         entryCode = replaceBundleReference(entryCode, assetName, uri);
         html = replaceBundleReference(html, assetName, uri);
+        const shortAssetName = basename(assetName);
+        if (shortAssetName !== assetName) {
+          entryCode = replaceBundleReference(entryCode, shortAssetName, uri);
+          html = replaceBundleReference(html, shortAssetName, uri);
+        }
       }
 
       const entryDependencies = [...new Set([...entryChunk.imports, ...entryChunk.dynamicImports])];
       for (const dependency of entryDependencies) {
         const dependencyOutput = bundle[dependency];
         if (!dependencyOutput || dependencyOutput.type !== 'chunk') continue;
-        entryCode = replaceBundleReference(entryCode, dependency, buildChunkUri(dependency));
+        const dependencyUri = buildChunkUri(dependency);
+        entryCode = replaceBundleReference(entryCode, dependency, dependencyUri);
+        const shortDependency = basename(dependency);
+        if (shortDependency !== dependency) {
+          entryCode = replaceBundleReference(entryCode, shortDependency, dependencyUri);
+        }
+      }
+
+      for (const [candidateName, candidateOutput] of Object.entries(bundle)) {
+        if (candidateName === entryName || candidateOutput.type !== 'chunk') continue;
+        const shortCandidate = basename(candidateName);
+        if (!entryCode.includes(candidateName) && !entryCode.includes(shortCandidate)) continue;
+        const candidateUri = buildChunkUri(candidateName);
+        entryCode = replaceBundleReference(entryCode, candidateName, candidateUri);
+        if (shortCandidate !== candidateName) {
+          entryCode = replaceBundleReference(entryCode, shortCandidate, candidateUri);
+        }
       }
 
       html = html.replace(
