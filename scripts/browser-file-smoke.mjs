@@ -201,7 +201,7 @@ async function verifyLoadedAndCollect(cdp, hash, externalRequests, browserMessag
   });
   cdp.on('Runtime.exceptionThrown', (params) => {
     const details = params?.exceptionDetails;
-    if (details) browserMessages.push(`EXCEPTION: ${details.text ?? ''} ${details.exception?.description ?? ''}`);
+    if (details) browserMessages.push(`EXCEPTION @ ${details.lineNumber ?? '?'}:${details.columnNumber ?? '?'}: ${details.text ?? ''} ${details.exception?.description ?? ''}`);
   });
   cdp.on('Runtime.consoleAPICalled', (params) => {
     if (params?.type === 'error' || params?.type === 'warning') {
