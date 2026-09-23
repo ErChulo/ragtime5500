@@ -26,6 +26,9 @@ jobs:
       - name: Install development dependencies
         run: npm install --no-audit --no-fund
 
+      - name: Verify SQLite schema contracts
+        run: python3 tests/verify_schema.py
+
       - name: Run complete source check
         run: npm run check
 
