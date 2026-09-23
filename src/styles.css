@@ -466,6 +466,29 @@ button.button-tertiary:hover:not(:disabled) {
   .health-grid dd { margin-bottom: .5rem; }
 }
 
+
+.backup-section {
+  padding: .85rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: rgba(8, 13, 19, .5);
+}
+.backup-section + .backup-section { margin-top: .8rem; }
+.backup-section-secondary { background: rgba(8, 13, 19, .28); }
+.backup-section-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: .8rem;
+  margin-bottom: .65rem;
+}
+.backup-section-heading strong { color: var(--text); }
+.backup-section-heading span {
+  color: var(--muted);
+  font-size: .75rem;
+  text-align: right;
+}
+
 @media (max-width: 1180px) {
   .hierarchy-columns { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .query-grid { grid-template-columns: repeat(3, minmax(120px, 1fr)); }

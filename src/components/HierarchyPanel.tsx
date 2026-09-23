@@ -192,8 +192,8 @@ export function HierarchyPanel({ refreshToken }: { refreshToken: number }) {
           <select aria-label="Cases" size={6} value={caseId ?? ''} onChange={(event) => setCaseId(Number(event.target.value))}>
             {cases.map((row) => <option key={String(row.case_id)} value={Number(row.case_id)}>{String(row.case_name)}</option>)}
           </select>
-          <label>Case name<input value={caseName} onChange={(event) => setCaseName(event.target.value)} /></label>
-          <label>Notes<textarea rows={3} value={caseNotes} onChange={(event) => setCaseNotes(event.target.value)} /></label>
+          <label>Case name<input aria-label="Case name" value={caseName} onChange={(event) => setCaseName(event.target.value)} /></label>
+          <label>Notes<textarea aria-label="Case notes" rows={3} value={caseNotes} onChange={(event) => setCaseNotes(event.target.value)} /></label>
           <div className="button-row">
             {caseId === null
               ? <button type="button" disabled={!caseName.trim()} onClick={() => guarded(() => createCase(caseName.trim(), nullable(caseNotes)), 'Case created.')}>Create case</button>
@@ -212,8 +212,8 @@ export function HierarchyPanel({ refreshToken }: { refreshToken: number }) {
           <select aria-label="Plans" size={6} value={planId ?? ''} onChange={(event) => setPlanId(Number(event.target.value))}>
             {plans.map((row) => <option key={String(row.plan_id)} value={Number(row.plan_id)}>{String(row.plan_number ?? '')} — {String(row.plan_name)}</option>)}
           </select>
-          <label>Plan name<input value={planName} onChange={(event) => setPlanName(event.target.value)} /></label>
-          <label>Plan number<input value={planNumber} onChange={(event) => setPlanNumber(event.target.value)} /></label>
+          <label>Plan name<input aria-label="Plan name" value={planName} onChange={(event) => setPlanName(event.target.value)} /></label>
+          <label>Plan number<input aria-label="Plan number" value={planNumber} onChange={(event) => setPlanNumber(event.target.value)} /></label>
           <div className="button-row">
             {planId === null
               ? <button type="button" disabled={caseId === null || !planName.trim()} onClick={() => guarded(() => createPlan(caseId!, planName.trim(), nullable(planNumber)), 'Plan created.')}>Create plan</button>
@@ -232,9 +232,9 @@ export function HierarchyPanel({ refreshToken }: { refreshToken: number }) {
           <select aria-label="Plan years" size={6} value={planYearId ?? ''} onChange={(event) => setPlanYearId(Number(event.target.value))}>
             {years.map((row) => <option key={String(row.plan_year_id)} value={Number(row.plan_year_id)}>{String(row.year)}</option>)}
           </select>
-          <label>Plan year<input type="number" value={year} onChange={(event) => setYear(Number(event.target.value))} /></label>
-          <label>Period begin<input type="date" value={periodBegin} onChange={(event) => setPeriodBegin(event.target.value)} /></label>
-          <label>Period end<input type="date" value={periodEnd} onChange={(event) => setPeriodEnd(event.target.value)} /></label>
+          <label>Plan year<input aria-label="Plan year" type="number" value={year} onChange={(event) => setYear(Number(event.target.value))} /></label>
+          <label>Period begin<input aria-label="Period begin" type="date" value={periodBegin} onChange={(event) => setPeriodBegin(event.target.value)} /></label>
+          <label>Period end<input aria-label="Period end" type="date" value={periodEnd} onChange={(event) => setPeriodEnd(event.target.value)} /></label>
           <div className="button-row">
             {planYearId === null
               ? <button type="button" disabled={planId === null} onClick={() => guarded(() => createPlanYear(planId!, year, nullable(periodBegin), nullable(periodEnd)), 'Plan year created.')}>Create year</button>
@@ -261,8 +261,8 @@ export function HierarchyPanel({ refreshToken }: { refreshToken: number }) {
               <span className="data-badge">{String(row.filing_status)}</span>
             </button>)}
           </div>
-          <label>Filing type<input value={filingType} onChange={(event) => setFilingType(event.target.value)} /></label>
-          <label>Filing date<input type="date" value={filingDate} onChange={(event) => setFilingDate(event.target.value)} /></label>
+          <label>Filing type<input aria-label="Filing type" value={filingType} onChange={(event) => setFilingType(event.target.value)} /></label>
+          <label>Filing date<input aria-label="Filing date" type="date" value={filingDate} onChange={(event) => setFilingDate(event.target.value)} /></label>
           <div className="button-row">
             {filingId === null
               ? <button type="button" disabled={planYearId === null || !filingType.trim()} onClick={() => guarded(() => createFiling(planYearId!, filingType.trim(), nullable(filingDate)), 'Filing created.')}>Create filing</button>

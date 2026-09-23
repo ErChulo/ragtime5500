@@ -23,8 +23,18 @@ async function ensurePath(path: string[]): Promise<FileSystemDirectoryHandle> {
 }
 
 function extensionOf(filename: string): string {
-  const match = filename.match(/(.[A-Za-z0-9]{1,12})$/);
+  const match = filename.match(/(\.[A-Za-z0-9]{1,12})$/);
   return match ? match[1].toLowerCase() : '';
+}
+
+function parseStorageKey(storageKey: string): { directories: string[]; filename: string } {
+  const parts = storageKey.split('/').filter(Boolean);
+  if (parts.shift() !== ROOT || parts.length < 2) throw new Error('Invalid Ragtime 5500 storage key.');
+  const filename = parts.pop()!;
+  if (!parts.every((part) => /^[A-Za-z0-9._-]+$/.test(part)) || !/^[A-Za-z0-9._-]+$/.test(filename)) {
+    throw new Error('Storage key contains an unsupported path segment.');
+  }
+  return { directories: parts, filename };
 }
 
 export async function storeLocalFile(file: File, category: 'csv' | 'pdf' | 'backup' | 'other'): Promise<StoredFile> {
@@ -49,21 +59,32 @@ export async function storeLocalFile(file: File, category: 'csv' | 'pdf' | 'back
   };
 }
 
+export async function writeStoredFile(storageKey: string, bytes: Uint8Array): Promise<void> {
+  const { directories, filename } = parseStorageKey(storageKey);
+  const directory = await ensurePath(directories);
+  const handle = await directory.getFileHandle(filename, { create: true });
+  const writable = await handle.createWritable();
+  await writable.write(bytes);
+  await writable.close();
+}
+
 export async function readStoredFile(storageKey: string): Promise<Uint8Array> {
-  const parts = storageKey.split('/').filter(Boolean);
-  if (parts.shift() !== ROOT || parts.length < 2) throw new Error('Invalid Ragtime 5500 storage key.');
-  const filename = parts.pop()!;
+  const { directories, filename } = parseStorageKey(storageKey);
   let directory = await rootDirectory();
-  for (const part of parts) directory = await directory.getDirectoryHandle(part);
+  for (const part of directories) directory = await directory.getDirectoryHandle(part);
   const file = await (await directory.getFileHandle(filename)).getFile();
   return new Uint8Array(await file.arrayBuffer());
 }
 
 export async function deleteStoredFile(storageKey: string): Promise<void> {
-  const parts = storageKey.split('/').filter(Boolean);
-  if (parts.shift() !== ROOT || parts.length < 2) return;
-  const filename = parts.pop()!;
+  let parsed: { directories: string[]; filename: string };
+  try {
+    parsed = parseStorageKey(storageKey);
+  } catch {
+    return;
+  }
+
   let directory = await rootDirectory();
-  for (const part of parts) directory = await directory.getDirectoryHandle(part);
-  await directory.removeEntry(filename);
+  for (const part of parsed.directories) directory = await directory.getDirectoryHandle(part);
+  await directory.removeEntry(parsed.filename);
 }
