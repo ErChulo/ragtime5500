@@ -29,6 +29,20 @@ jobs:
       - name: Run complete source check
         run: npm run check
 
+      - name: Smoke test standalone HTML over file protocol
+        run: |
+          CHROME="$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
+          if [ -z "$CHROME" ]; then
+            echo "No Chromium-family browser is available on this runner." >&2
+            exit 1
+          fi
+          "$CHROME" --headless=new --no-sandbox --disable-gpu --virtual-time-budget=8000             --dump-dom "file://$PWD/dist/ragtime5500.html#/workspace" > /tmp/ragtime-workspace.html
+          grep -q "Database ready" /tmp/ragtime-workspace.html
+          grep -q "Cases, plans, plan years, and filings" /tmp/ragtime-workspace.html
+
+          "$CHROME" --headless=new --no-sandbox --disable-gpu --virtual-time-budget=3000             --dump-dom "file://$PWD/dist/ragtime5500.html#/review" > /tmp/ragtime-review.html
+          grep -q "PDF matching review" /tmp/ragtime-review.html
+
       - name: Record standalone artifact checksum
         run: sha256sum dist/ragtime5500.html
 
