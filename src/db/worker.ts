@@ -10,6 +10,7 @@ type Request =
   | { id: number; type: 'init' }
   | { id: number; type: 'exec'; sql: string; bind?: Bind }
   | { id: number; type: 'transaction'; statements: Array<{ sql: string; bind?: Bind }> }
+  | { id: number; type: 'diagnostics' }
   | { id: number; type: 'export' }
   | { id: number; type: 'restore'; bytes: ArrayBuffer }
   | { id: number; type: 'close' };
@@ -17,6 +18,15 @@ type Request =
 type Response =
   | { id: number; ok: true; result: unknown }
   | { id: number; ok: false; error: string };
+
+interface Diagnostics {
+  quickCheck: string;
+  foreignKeyViolationCount: number;
+  migrationVersion: number;
+  pageCount: number;
+  pageSize: number;
+  databaseBytes: number;
+}
 
 const DB_NAME = '/ragtime5500.sqlite3';
 let sqlite3: any;
@@ -85,6 +95,32 @@ async function applyMigrations(): Promise<void> {
   }
 }
 
+function diagnostics(): Diagnostics {
+  const quickRows = execRows('PRAGMA quick_check') as Array<Record<string, unknown>>;
+  const quickCheck = String(quickRows[0]?.quick_check ?? quickRows[0]?.integrity_check ?? '');
+  const foreignKeyViolationCount = (execRows('PRAGMA foreign_key_check') as unknown[]).length;
+  const migrationVersion = Number(db.selectValue('SELECT COALESCE(MAX(version),0) FROM schema_migration') ?? 0);
+  const pageCount = Number(db.selectValue('PRAGMA page_count') ?? 0);
+  const pageSize = Number(db.selectValue('PRAGMA page_size') ?? 0);
+  return {
+    quickCheck,
+    foreignKeyViolationCount,
+    migrationVersion,
+    pageCount,
+    pageSize,
+    databaseBytes: pageCount * pageSize,
+  };
+}
+
+function assertHealthy(result: Diagnostics): void {
+  if (result.quickCheck.toLowerCase() !== 'ok') {
+    throw new Error(`SQLite quick_check failed: ${result.quickCheck || 'unknown result'}.`);
+  }
+  if (result.foreignKeyViolationCount !== 0) {
+    throw new Error(`SQLite foreign_key_check found ${result.foreignKeyViolationCount} violation(s).`);
+  }
+}
+
 async function openDatabase(): Promise<void> {
   if (!sqlite3) {
     const scope = globalThis as typeof globalThis & { sqlite3ApiConfig?: Record<string, unknown> };
@@ -144,19 +180,51 @@ async function handle(request: Request): Promise<unknown> {
       }
     }
 
+    case 'diagnostics':
+      await openDatabase();
+      return diagnostics();
+
     case 'export': {
       await openDatabase();
+      const result = diagnostics();
+      assertHealthy(result);
       const bytes = pool.exportFile(DB_NAME) as Uint8Array;
       return bytes.slice().buffer;
     }
 
-    case 'restore':
+    case 'restore': {
       await openDatabase();
-      db.close();
-      db = undefined;
-      pool.importDb(DB_NAME, new Uint8Array(request.bytes));
-      await openDatabase();
-      return { restored: true };
+      const previous = (pool.exportFile(DB_NAME) as Uint8Array).slice();
+
+      try {
+        db.close();
+        db = undefined;
+        pool.importDb(DB_NAME, new Uint8Array(request.bytes));
+        await openDatabase();
+        const result = diagnostics();
+        assertHealthy(result);
+        return { restored: true, diagnostics: result };
+      } catch (error) {
+        try {
+          if (db) db.close();
+        } catch {
+          // Continue with restoration of the previous known-good database.
+        }
+        db = undefined;
+
+        try {
+          pool.importDb(DB_NAME, previous);
+          await openDatabase();
+          assertHealthy(diagnostics());
+        } catch (rollbackError) {
+          throw new Error(
+            `Restore failed and the previous database could not be reopened: ${rollbackError instanceof Error ? rollbackError.message : String(rollbackError)}`,
+          );
+        }
+
+        throw new Error(`Restore rejected; the previous database was preserved. ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
 
     case 'close':
       if (db) {

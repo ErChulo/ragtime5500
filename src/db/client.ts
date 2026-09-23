@@ -3,6 +3,15 @@ import DbWorker from './worker?worker&inline';
 type BindValue = string | number | bigint | null | Uint8Array;
 export type SqlBind = BindValue[] | Record<string, BindValue>;
 
+export interface DbDiagnostics {
+  quickCheck: string;
+  foreignKeyViolationCount: number;
+  migrationVersion: number;
+  pageCount: number;
+  pageSize: number;
+  databaseBytes: number;
+}
+
 interface Pending {
   resolve: (value: unknown) => void;
   reject: (reason?: unknown) => void;
@@ -53,11 +62,15 @@ export class DbClient {
     return this.request({ type: 'transaction', statements });
   }
 
+  diagnostics(): Promise<DbDiagnostics> {
+    return this.request({ type: 'diagnostics' });
+  }
+
   exportDatabase(): Promise<ArrayBuffer> {
     return this.request({ type: 'export' });
   }
 
-  restoreDatabase(bytes: ArrayBuffer): Promise<{ restored: boolean }> {
+  restoreDatabase(bytes: ArrayBuffer): Promise<{ restored: boolean; diagnostics: DbDiagnostics }> {
     return this.request({ type: 'restore', bytes }, [bytes]);
   }
 

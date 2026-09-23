@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { queryValue } from '../db/repository';
+import { downloadCsv } from '../utils/csvExport';
 import { ProvenanceCard } from './ProvenanceCard';
 
 export function QueryPanel() {
@@ -25,6 +26,7 @@ export function QueryPanel() {
       setRows(result);
       setStatus(result.length ? `${result.length} structured value${result.length === 1 ? '' : 's'} matched.` : 'No authoritative structured value matched.');
     } catch (error) {
+      setRows([]);
       setStatus(error instanceof Error ? error.message : String(error));
     }
   };
@@ -48,6 +50,14 @@ export function QueryPanel() {
       </div>
       <div className="panel-actions">
         <button type="button" onClick={run}>Run structured query</button>
+        <button
+          className="button-secondary"
+          type="button"
+          disabled={!rows.length}
+          onClick={() => downloadCsv(rows, `ragtime5500-query-${year}.csv`)}
+        >
+          Export results CSV
+        </button>
         <span className="action-hint">Results include their complete source provenance.</span>
       </div>
       {status ? <p className="status" role="status">{status}</p> : null}

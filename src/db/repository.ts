@@ -45,6 +45,13 @@ export async function importEfastRows(caseName: string, stored: StoredFile, rows
       sql: `INSERT INTO efast_import(source_document_id, row_count) VALUES(?,?)`,
       bind: [sourceDocumentId, rows.length],
     },
+    {
+      sql: `INSERT INTO audit_log(entity_type,entity_id,action,old_value,new_value)
+            SELECT 'EFAST_IMPORT',efast_import_id,'IMPORT',NULL,
+                   json_object('source_document_id',source_document_id,'row_count',row_count)
+            FROM efast_import WHERE source_document_id=?`,
+      bind: [sourceDocumentId],
+    },
   ];
 
   for (const row of rows) {
@@ -272,7 +279,45 @@ export async function listCases(): Promise<Array<Record<string, unknown>>> {
 }
 
 export async function createCase(caseName: string, notes: string | null = null): Promise<void> {
-  await db.exec('INSERT INTO pension_case(case_name,notes) VALUES(?,?)', [caseName, notes]);
+  await db.transaction([
+    { sql: 'INSERT INTO pension_case(case_name,notes) VALUES(?,?)', bind: [caseName, notes] },
+    {
+      sql: `INSERT INTO audit_log(entity_type,entity_id,action,old_value,new_value)
+            SELECT 'PENSION_CASE',case_id,'CREATE',NULL,
+                   json_object('case_name',case_name,'notes',notes)
+            FROM pension_case WHERE case_id=last_insert_rowid()`,
+    },
+  ]);
+}
+
+export async function updateCase(caseId: number, caseName: string, notes: string | null): Promise<void> {
+  await db.transaction([
+    {
+      sql: `INSERT INTO audit_log(entity_type,entity_id,action,old_value,new_value)
+            SELECT 'PENSION_CASE',case_id,'UPDATE',
+                   json_object('case_name',case_name,'notes',notes),
+                   json_object('case_name',?,'notes',?)
+            FROM pension_case WHERE case_id=?`,
+      bind: [caseName, notes, caseId],
+    },
+    {
+      sql: `UPDATE pension_case SET case_name=?,notes=?,updated_at=CURRENT_TIMESTAMP WHERE case_id=?`,
+      bind: [caseName, notes, caseId],
+    },
+  ]);
+}
+
+export async function deleteCase(caseId: number): Promise<void> {
+  await db.transaction([
+    {
+      sql: `INSERT INTO audit_log(entity_type,entity_id,action,old_value,new_value)
+            SELECT 'PENSION_CASE',case_id,'DELETE',
+                   json_object('case_name',case_name,'notes',notes),NULL
+            FROM pension_case WHERE case_id=?`,
+      bind: [caseId],
+    },
+    { sql: 'DELETE FROM pension_case WHERE case_id=?', bind: [caseId] },
+  ]);
 }
 
 export async function queryValue(filters: {
@@ -302,15 +347,45 @@ export async function listPlans(caseId: number): Promise<Array<Record<string, un
 }
 
 export async function createPlan(caseId: number, planName: string, planNumber: string | null): Promise<void> {
-  await db.exec('INSERT INTO plan(case_id,plan_name,plan_number) VALUES(?,?,?)', [caseId, planName, planNumber]);
+  await db.transaction([
+    { sql: 'INSERT INTO plan(case_id,plan_name,plan_number) VALUES(?,?,?)', bind: [caseId, planName, planNumber] },
+    {
+      sql: `INSERT INTO audit_log(entity_type,entity_id,action,old_value,new_value)
+            SELECT 'PLAN',plan_id,'CREATE',NULL,
+                   json_object('case_id',case_id,'plan_name',plan_name,'plan_number',plan_number)
+            FROM plan WHERE plan_id=last_insert_rowid()`,
+    },
+  ]);
 }
 
 export async function updatePlan(planId: number, planName: string, planNumber: string | null): Promise<void> {
-  await db.exec('UPDATE plan SET plan_name=?,plan_number=?,updated_at=CURRENT_TIMESTAMP WHERE plan_id=?', [planName, planNumber, planId]);
+  await db.transaction([
+    {
+      sql: `INSERT INTO audit_log(entity_type,entity_id,action,old_value,new_value)
+            SELECT 'PLAN',plan_id,'UPDATE',
+                   json_object('plan_name',plan_name,'plan_number',plan_number),
+                   json_object('plan_name',?,'plan_number',?)
+            FROM plan WHERE plan_id=?`,
+      bind: [planName, planNumber, planId],
+    },
+    {
+      sql: 'UPDATE plan SET plan_name=?,plan_number=?,updated_at=CURRENT_TIMESTAMP WHERE plan_id=?',
+      bind: [planName, planNumber, planId],
+    },
+  ]);
 }
 
 export async function deletePlan(planId: number): Promise<void> {
-  await db.exec('DELETE FROM plan WHERE plan_id=?', [planId]);
+  await db.transaction([
+    {
+      sql: `INSERT INTO audit_log(entity_type,entity_id,action,old_value,new_value)
+            SELECT 'PLAN',plan_id,'DELETE',
+                   json_object('case_id',case_id,'plan_name',plan_name,'plan_number',plan_number),NULL
+            FROM plan WHERE plan_id=?`,
+      bind: [planId],
+    },
+    { sql: 'DELETE FROM plan WHERE plan_id=?', bind: [planId] },
+  ]);
 }
 
 export async function listPlanYears(planId: number): Promise<Array<Record<string, unknown>>> {
@@ -318,15 +393,48 @@ export async function listPlanYears(planId: number): Promise<Array<Record<string
 }
 
 export async function createPlanYear(planId: number, year: number, periodBegin: string | null, periodEnd: string | null): Promise<void> {
-  await db.exec('INSERT INTO plan_year(plan_id,year,period_begin,period_end) VALUES(?,?,?,?)', [planId, year, periodBegin, periodEnd]);
+  await db.transaction([
+    {
+      sql: 'INSERT INTO plan_year(plan_id,year,period_begin,period_end) VALUES(?,?,?,?)',
+      bind: [planId, year, periodBegin, periodEnd],
+    },
+    {
+      sql: `INSERT INTO audit_log(entity_type,entity_id,action,old_value,new_value)
+            SELECT 'PLAN_YEAR',plan_year_id,'CREATE',NULL,
+                   json_object('plan_id',plan_id,'year',year,'period_begin',period_begin,'period_end',period_end)
+            FROM plan_year WHERE plan_year_id=last_insert_rowid()`,
+    },
+  ]);
 }
 
 export async function updatePlanYear(planYearId: number, year: number, periodBegin: string | null, periodEnd: string | null): Promise<void> {
-  await db.exec('UPDATE plan_year SET year=?,period_begin=?,period_end=?,updated_at=CURRENT_TIMESTAMP WHERE plan_year_id=?', [year, periodBegin, periodEnd, planYearId]);
+  await db.transaction([
+    {
+      sql: `INSERT INTO audit_log(entity_type,entity_id,action,old_value,new_value)
+            SELECT 'PLAN_YEAR',plan_year_id,'UPDATE',
+                   json_object('year',year,'period_begin',period_begin,'period_end',period_end),
+                   json_object('year',?,'period_begin',?,'period_end',?)
+            FROM plan_year WHERE plan_year_id=?`,
+      bind: [year, periodBegin, periodEnd, planYearId],
+    },
+    {
+      sql: 'UPDATE plan_year SET year=?,period_begin=?,period_end=?,updated_at=CURRENT_TIMESTAMP WHERE plan_year_id=?',
+      bind: [year, periodBegin, periodEnd, planYearId],
+    },
+  ]);
 }
 
 export async function deletePlanYear(planYearId: number): Promise<void> {
-  await db.exec('DELETE FROM plan_year WHERE plan_year_id=?', [planYearId]);
+  await db.transaction([
+    {
+      sql: `INSERT INTO audit_log(entity_type,entity_id,action,old_value,new_value)
+            SELECT 'PLAN_YEAR',plan_year_id,'DELETE',
+                   json_object('plan_id',plan_id,'year',year,'period_begin',period_begin,'period_end',period_end),NULL
+            FROM plan_year WHERE plan_year_id=?`,
+      bind: [planYearId],
+    },
+    { sql: 'DELETE FROM plan_year WHERE plan_year_id=?', bind: [planYearId] },
+  ]);
 }
 
 export async function listFilings(planYearId: number): Promise<Array<Record<string, unknown>>> {
@@ -335,15 +443,49 @@ export async function listFilings(planYearId: number): Promise<Array<Record<stri
 }
 
 export async function createFiling(planYearId: number, filingType: string, filingDate: string | null): Promise<void> {
-  await db.exec('INSERT INTO filing(plan_year_id,filing_type,filing_date) VALUES(?,?,?)', [planYearId, filingType, filingDate]);
+  await db.transaction([
+    {
+      sql: 'INSERT INTO filing(plan_year_id,filing_type,filing_date) VALUES(?,?,?)',
+      bind: [planYearId, filingType, filingDate],
+    },
+    {
+      sql: `INSERT INTO audit_log(entity_type,entity_id,action,old_value,new_value)
+            SELECT 'FILING',filing_id,'CREATE',NULL,
+                   json_object('plan_year_id',plan_year_id,'filing_type',filing_type,'filing_date',filing_date)
+            FROM filing WHERE filing_id=last_insert_rowid()`,
+    },
+  ]);
 }
 
 export async function updateFiling(filingId: number, filingType: string, filingDate: string | null): Promise<void> {
-  await db.exec('UPDATE filing SET filing_type=?,filing_date=? WHERE filing_id=?', [filingType, filingDate, filingId]);
+  await db.transaction([
+    {
+      sql: `INSERT INTO audit_log(entity_type,entity_id,action,old_value,new_value)
+            SELECT 'FILING',filing_id,'UPDATE',
+                   json_object('filing_type',filing_type,'filing_date',filing_date),
+                   json_object('filing_type',?,'filing_date',?)
+            FROM filing WHERE filing_id=?`,
+      bind: [filingType, filingDate, filingId],
+    },
+    {
+      sql: 'UPDATE filing SET filing_type=?,filing_date=? WHERE filing_id=?',
+      bind: [filingType, filingDate, filingId],
+    },
+  ]);
 }
 
 export async function deleteFiling(filingId: number): Promise<void> {
-  await db.exec('DELETE FROM filing WHERE filing_id=?', [filingId]);
+  await db.transaction([
+    {
+      sql: `INSERT INTO audit_log(entity_type,entity_id,action,old_value,new_value)
+            SELECT 'FILING',filing_id,'DELETE',
+                   json_object('plan_year_id',plan_year_id,'filing_type',filing_type,'filing_date',filing_date,
+                               'efast_filing_id',efast_filing_id,'filing_status',filing_status),NULL
+            FROM filing WHERE filing_id=?`,
+      bind: [filingId],
+    },
+    { sql: 'DELETE FROM filing WHERE filing_id=?', bind: [filingId] },
+  ]);
 }
 
 export async function listDocumentMatches(): Promise<Array<Record<string, unknown>>> {
@@ -465,4 +607,67 @@ export async function acceptDocumentMatch(documentMatchId: number, importRowId: 
     planYear: target.plan_year,
     storageKey: match.storage_key,
   };
+}
+
+
+export async function listAuditLog(limit = 200): Promise<Array<Record<string, unknown>>> {
+  const safeLimit = Math.max(1, Math.min(1000, Math.trunc(limit)));
+  return db.exec(
+    `SELECT audit_id,entity_type,entity_id,action,old_value,new_value,timestamp
+     FROM audit_log ORDER BY audit_id DESC LIMIT ?`,
+    [safeLimit],
+  );
+}
+
+export async function listSourceDocuments(): Promise<Array<Record<string, unknown>>> {
+  return db.exec(
+    `SELECT source_document_id,filename,storage_key,mime_type,sha256,file_size,source_type,imported_at
+     FROM source_document ORDER BY source_document_id`,
+  );
+}
+
+export async function searchDocumentText(
+  query: string,
+  year?: number,
+): Promise<Array<Record<string, unknown>>> {
+  const text = query.trim();
+  if (!text) return [];
+  const bind: (string | number)[] = [text];
+  const yearClause = year === undefined ? '' : 'AND py.year=?';
+  if (year !== undefined) bind.push(year);
+
+  return db.exec(
+    `SELECT dc.chunk_id, dc.page_number, dc.section,
+            snippet(document_chunk_fts,0,'[',']',' … ',18) AS snippet,
+            sd.filename AS source_filename, sd.storage_key, sd.sha256 AS source_sha256,
+            pc.case_name, p.plan_name, p.plan_number, py.year AS plan_year,
+            bm25(document_chunk_fts) AS rank
+     FROM document_chunk_fts
+     JOIN document_chunk dc ON dc.chunk_id=document_chunk_fts.chunk_id
+     JOIN source_document sd ON sd.source_document_id=dc.source_document_id
+     LEFT JOIN filing f ON f.source_document_id=sd.source_document_id
+     LEFT JOIN plan_year py ON py.plan_year_id=f.plan_year_id
+     LEFT JOIN plan p ON p.plan_id=py.plan_id
+     LEFT JOIN pension_case pc ON pc.case_id=p.case_id
+     WHERE document_chunk_fts MATCH ? ${yearClause}
+     ORDER BY rank, py.year DESC, dc.page_number
+     LIMIT 100`,
+    bind,
+  );
+}
+
+export async function queryCanonicalHistory(
+  canonicalConcept: string,
+): Promise<Array<Record<string, unknown>>> {
+  const concept = canonicalConcept.trim();
+  if (!concept) return [];
+  return db.exec(
+    `SELECT case_name,plan_name,plan_number,plan_year,schedule_name,part,location_reference,
+            subfield,canonical_concept,normalized_number,normalized_text,verification_status,
+            source_filename,source_page,filing_value_id
+     FROM filing_value_provenance
+     WHERE canonical_concept=?
+     ORDER BY plan_name,plan_year,subfield`,
+    [concept],
+  );
 }

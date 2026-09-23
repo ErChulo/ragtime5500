@@ -9,6 +9,10 @@ import { MatchReview } from '../components/MatchReview';
 import { ExtractionReview } from '../components/ExtractionReview';
 import { AppNavigation, appSections } from '../components/AppNavigation';
 import { BackupRestorePanel } from '../components/BackupRestorePanel';
+import { DatabaseHealthPanel } from '../components/DatabaseHealthPanel';
+import { AuditHistoryPanel } from '../components/AuditHistoryPanel';
+import { DocumentSearchPanel } from '../components/DocumentSearchPanel';
+import { ConceptHistoryPanel } from '../components/ConceptHistoryPanel';
 import { useHashSection } from './routes';
 
 export default function App() {
@@ -82,10 +86,20 @@ export default function App() {
               <ExtractionReview refreshToken={refreshToken} onChanged={refresh} />
             </>
           ) : null}
-          {activeSection === 'explore' ? <QueryPanel /> : null}
+          {activeSection === 'explore' ? (
+            <>
+              <QueryPanel />
+              <ConceptHistoryPanel />
+              <DocumentSearchPanel />
+            </>
+          ) : null}
           {activeSection === 'database' ? (
             <>
-              <BackupRestorePanel onRestored={refresh} />
+              <div className="two-column">
+                <BackupRestorePanel onRestored={refresh} />
+                <DatabaseHealthPanel />
+              </div>
+              <AuditHistoryPanel refreshToken={refreshToken} />
               <SqlConsole />
             </>
           ) : null}
