@@ -46,7 +46,7 @@ export async function storeLocalFile(file: File, category: 'csv' | 'pdf' | 'back
   const storedName = `${sha256}${extension}`;
   const handle = await directory.getFileHandle(storedName, { create: true });
   const writable = await handle.createWritable();
-  await writable.write(bytes);
+  await writable.write(buffer);
   await writable.close();
 
   return {
@@ -64,7 +64,9 @@ export async function writeStoredFile(storageKey: string, bytes: Uint8Array): Pr
   const directory = await ensurePath(directories);
   const handle = await directory.getFileHandle(filename, { create: true });
   const writable = await handle.createWritable();
-  await writable.write(bytes);
+  const copy = new Uint8Array(bytes.byteLength);
+  copy.set(bytes);
+  await writable.write(copy.buffer);
   await writable.close();
 }
 
