@@ -186,6 +186,19 @@ async function waitFor(cdp, expression, description, timeoutMs = 12000) {
 }
 
 
+
+async function debuggerSourceSnippet(cdp, scriptId, lineNumber, columnNumber) {
+  try {
+    const result = await cdp.send('Debugger.getScriptSource', { scriptId });
+    const lines = String(result.scriptSource ?? '').split(/\r?\n/);
+    const line = lines[Math.max(0, Number(lineNumber))] ?? '';
+    const column = Math.max(0, Number(columnNumber) || 0);
+    return line.slice(Math.max(0, column - 900), column + 900);
+  } catch {
+    return 'debugger source snippet unavailable';
+  }
+}
+
 async function sourceSnippet(lineNumber, columnNumber) {
   try {
     const html = await readFile(htmlPath, 'utf8');
@@ -200,6 +213,7 @@ async function sourceSnippet(lineNumber, columnNumber) {
 
 async function verifyLoadedAndCollect(cdp, hash, externalRequests, browserMessages) {
   await cdp.send('Runtime.enable');
+  await cdp.send('Debugger.enable');
   await cdp.send('Page.enable');
   await cdp.send('Network.enable');
   await cdp.send('Log.enable');
@@ -214,7 +228,7 @@ async function verifyLoadedAndCollect(cdp, hash, externalRequests, browserMessag
   });
   cdp.on('Runtime.exceptionThrown', (params) => {
     const details = params?.exceptionDetails;
-    if (details) browserMessages.push(`EXCEPTION @ ${details.lineNumber ?? '?'}:${details.columnNumber ?? '?'}: ${details.text ?? ''} ${details.exception?.description ?? ''}`);
+    if (details) browserMessages.push(`EXCEPTION @ ${details.lineNumber ?? '?'}:${details.columnNumber ?? '?'} [script ${details.scriptId ?? '?'}]: ${details.text ?? ''} ${details.exception?.description ?? ''}`);
   });
   cdp.on('Runtime.consoleAPICalled', (params) => {
     if (params?.type === 'error' || params?.type === 'warning') {
@@ -282,8 +296,10 @@ async function firstRun() {
   } catch (error) {
     const snapshot = await evaluate(session.cdp, `JSON.stringify({ href: location.href, title: document.title, text: document.body?.innerText?.slice(0, 4000) ?? '', html: document.documentElement?.outerHTML?.slice(0, 4000) ?? '' })`).catch(() => 'browser snapshot unavailable');
     const exception = browserMessages.find((message) => message.startsWith('EXCEPTION @ '));
-    const locationMatch = exception?.match(/EXCEPTION @ (\d+):(\d+):/);
-    const snippet = locationMatch ? await sourceSnippet(Number(locationMatch[1]), Number(locationMatch[2])) : 'no exception location available';
+    const locationMatch = exception?.match(/EXCEPTION @ (\d+):(\d+) \[script ([^\]]+)\]:/);
+    const snippet = locationMatch
+      ? await debuggerSourceSnippet(session.cdp, locationMatch[3], Number(locationMatch[1]), Number(locationMatch[2]))
+      : 'no exception location available';
     throw new Error(`${error instanceof Error ? error.message : String(error)}\nBrowser snapshot:\n${snapshot}\nBrowser messages:\n${browserMessages.join('\n')}\nCompiled source snippet:\n${snippet}\nChrome stderr:\n${session.stderr()}`);
   } finally {
     await closeChrome(session);
