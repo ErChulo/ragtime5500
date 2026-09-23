@@ -1,4 +1,4 @@
-import dbWorkerUrl from './worker?worker&url';
+import DbWorker from './worker?worker&inline';
 
 type BindValue = string | number | bigint | null | Uint8Array;
 export type SqlBind = BindValue[] | Record<string, BindValue>;
@@ -27,7 +27,7 @@ export class DbClient {
   private readonly pending = new Map<number, Pending>();
 
   constructor() {
-    this.worker = new Worker(dbWorkerUrl, { type: 'module', name: 'ragtime5500-db' });
+    this.worker = new DbWorker();
     this.worker.onmessage = (event: MessageEvent<WorkerResponse>) => {
       const response = event.data;
       const pending = this.pending.get(response.id);
