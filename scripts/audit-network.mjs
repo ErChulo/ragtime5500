@@ -4,6 +4,7 @@ import { extname, join, relative } from 'node:path';
 const ROOT = new URL('../', import.meta.url).pathname;
 const SOURCE_EXT = new Set(['.ts', '.tsx', '.js', '.mjs', '.html', '.css']);
 const ignored = new Set([
+  'index.html',
   'src/security/networkLockdown.ts',
   'scripts/audit-network.mjs',
   'scripts/serve-dist.mjs',
