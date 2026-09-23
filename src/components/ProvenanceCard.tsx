@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import { readStoredFile } from '../ingest/opfsFiles';
-import { renderPdfPage } from '../pdf/renderPage';
 import { provenanceUrlText } from '../security/externalUrl';
 
 interface Props {
@@ -17,9 +16,16 @@ export function ProvenanceCard({ row }: Props) {
     const storageKey = String(row.storage_key ?? '');
     const page = Number(row.source_page ?? 0);
     if (!storageKey || !page) return;
-    readStoredFile(storageKey)
-      .then((bytes) => renderPdfPage(bytes, page, canvasRef.current!))
-      .catch((e) => setError(e instanceof Error ? e.message : String(e)));
+    void (async () => {
+      try {
+        const bytes = await readStoredFile(storageKey);
+        const { renderPdfPage } = await import('../pdf/renderPage');
+        if (!canvasRef.current) return;
+        await renderPdfPage(bytes, page, canvasRef.current);
+      } catch (cause) {
+        setError(cause instanceof Error ? cause.message : String(cause));
+      }
+    })();
   }, [showPage, row]);
 
   return (
