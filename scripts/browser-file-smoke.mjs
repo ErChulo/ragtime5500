@@ -97,7 +97,8 @@ class CdpClient {
   }
 }
 
-async function launch() {
+async function launch(initialHash) {
+  const initialUrl = `${pathToFileURL(htmlPath).href}#/${initialHash}`;
   const child = spawn(chromePath, [
     '--headless=new',
     '--no-sandbox',
@@ -111,7 +112,7 @@ async function launch() {
     '--disable-features=OptimizationHints,MediaRouter',
     `--remote-debugging-port=${port}`,
     `--user-data-dir=${profile}`,
-    'about:blank',
+    initialUrl,
   ], { stdio: ['ignore', 'ignore', 'pipe'] });
 
   let stderr = '';
@@ -144,7 +145,7 @@ async function waitFor(cdp, expression, description, timeoutMs = 12000) {
   throw new Error(`Timed out waiting for ${description}.`);
 }
 
-async function navigateAndCollect(cdp, hash, externalRequests) {
+async function verifyLoadedAndCollect(cdp, externalRequests) {
   await cdp.send('Runtime.enable');
   await cdp.send('Page.enable');
   await cdp.send('Network.enable');
@@ -153,8 +154,6 @@ async function navigateAndCollect(cdp, hash, externalRequests) {
     if (/^https?:\/\//i.test(url)) externalRequests.push(url);
   });
 
-  const url = `${pathToFileURL(htmlPath).href}#/${hash}`;
-  await cdp.send('Page.navigate', { url });
   await waitFor(
     cdp,
     `document.readyState === 'complete' && document.body && document.body.innerText.includes('Database ready')`,
@@ -179,9 +178,9 @@ async function closeChrome(session) {
 
 async function firstRun() {
   const externalRequests = [];
-  const session = await launch();
+  const session = await launch('workspace');
   try {
-    await navigateAndCollect(session.cdp, 'workspace', externalRequests);
+    await verifyLoadedAndCollect(session.cdp, externalRequests);
 
     await evaluate(session.cdp, `(() => {
       const input = document.querySelector('input[aria-label="Case name"]');
@@ -219,9 +218,9 @@ async function firstRun() {
 
 async function secondRun() {
   const externalRequests = [];
-  const session = await launch();
+  const session = await launch('workspace');
   try {
-    await navigateAndCollect(session.cdp, 'workspace', externalRequests);
+    await verifyLoadedAndCollect(session.cdp, externalRequests);
 
     await waitFor(
       session.cdp,
