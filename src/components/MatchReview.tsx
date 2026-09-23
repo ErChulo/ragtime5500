@@ -8,6 +8,7 @@ import {
 import type { MatchableEfastRow } from '../matching/matchPdf';
 import { readStoredFile } from '../ingest/opfsFiles';
 import { extractScheduleH1c9 } from '../pdf/scheduleH1c9';
+import { extractPdfPages } from '../pdf/extractText';
 import { provenanceUrlText } from '../security/externalUrl';
 
 interface Props {
@@ -79,7 +80,6 @@ export function MatchReview({ refreshToken, onChanged }: Props) {
     try {
       const accepted = await acceptDocumentMatch(selectedMatchId, Number(targetRowId));
       const bytes = await readStoredFile(accepted.storageKey);
-      const { extractPdfPages } = await import('../pdf/extractText');
       const pages = await extractPdfPages(bytes);
       const extracted = extractScheduleH1c9(pages);
 
