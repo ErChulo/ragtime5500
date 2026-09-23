@@ -54,10 +54,8 @@ export function parseCsv(text: string): ParsedCsv {
     } else if (ch === ',') {
       raw += ch;
       pushField();
-    } else if (ch === '' || ch === '
-') {
-      if (ch === '' && text[i + 1] === '
-') i += 1;
+    } else if (ch === '\r' || ch === '\n') {
+      if (ch === '\r' && text[i + 1] === '\n') i += 1;
       pushRecord();
     } else {
       field += ch;
@@ -71,7 +69,7 @@ export function parseCsv(text: string): ParsedCsv {
 
   const [header, ...data] = records;
   const headers = header.fields.map((value, index) => {
-    const trimmed = index === 0 ? value.replace(/^﻿/, '').trim() : value.trim();
+    const trimmed = index === 0 ? value.replace(/^\uFEFF/, '').trim() : value.trim();
     if (!trimmed) throw new Error(`CSV header ${index + 1} is empty.`);
     return trimmed;
   });

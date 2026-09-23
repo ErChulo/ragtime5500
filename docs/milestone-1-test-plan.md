@@ -13,7 +13,7 @@
 - **PDF parser**: synthetic position-aware page fixtures recover both 1c(9) columns; uncertainty emits no value.
 - **Revision preservation**: correcting a value preserves the prior row in `filing_value_revision` and writes `audit_log`.
 - **FTS5**: inserted chunks are retrievable by local full-text search.
-- **Network audit**: source/build fail if forbidden network primitives or remote runtime imports/resources are found.
+- **Network audit**: source/build fail if forbidden network primitives or remote runtime imports are found.
 
 ## Browser integration
 

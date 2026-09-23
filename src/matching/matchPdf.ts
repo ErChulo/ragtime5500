@@ -14,13 +14,13 @@ export interface MatchableEfastRow {
 
 function basename(value: string | null): string | null {
   if (!value) return null;
-  const match = value.match(//([^/?#]+)(?:[?#].*)?$/);
+  const match = value.match(/\/([^/?#]+)(?:[?#].*)?$/);
   return match?.[1]?.toLowerCase() ?? null;
 }
 
 function normalizeName(value: string | null): string[] {
   if (!value) return [];
-  return value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().split(/s+/).filter(Boolean);
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().split(/\s+/).filter(Boolean);
 }
 
 function jaccard(a: string[], b: string[]): number {
@@ -32,10 +32,11 @@ function jaccard(a: string[], b: string[]): number {
   return union ? intersection / union : 0;
 }
 
+
 function normalizeDateSignal(value: string | null): string | null {
   if (!value) return null;
-  if (/^d{4}-d{2}-d{2}$/.test(value)) return value;
-  const match = value.match(/^(d{1,2})/(d{1,2})/(d{4})$/);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  const match = value.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
   if (!match) return null;
   return `${match[3]}-${match[1].padStart(2, '0')}-${match[2].padStart(2, '0')}`;
 }
@@ -46,19 +47,19 @@ function sameNullable(a: string | null | undefined, b: string | null | undefined
 
 export function inferDocumentSignals(filename: string, pages: PdfPageText[]): DocumentSignals {
   const firstText = pages.slice(0, 4).map((page) => page.text).join(' ');
-  const filenameStem = filename.replace(/.pdf$/i, '');
+  const filenameStem = filename.replace(/\.pdf$/i, '');
   const filingId = /^[A-Za-z0-9]{20,}$/.test(filenameStem)
     ? filenameStem
-    : firstText.match(/([A-Z0-9]{20,})/)?.[1] ?? null;
+    : firstText.match(/\b([A-Z0-9]{20,})\b/)?.[1] ?? null;
 
-  const planNumber = firstText.match(/plans*(?:number|no.?|#)s*[:-]?s*(d{1,3})/i)?.[1] ?? null;
-  const ein = firstText.match(/(d{2}-d{7})/)?.[1] ?? null;
-  const explicitYear = firstText.match(/plans+year(?:s+beginning)?[^0-9]{0,40}(20d{2}|19d{2})/i)?.[1];
+  const planNumber = firstText.match(/plan\s*(?:number|no\.?|#)\s*[:\-]?\s*(\d{1,3})\b/i)?.[1] ?? null;
+  const ein = firstText.match(/\b(\d{2}-\d{7})\b/)?.[1] ?? null;
+  const explicitYear = firstText.match(/plan\s+year(?:\s+beginning)?[^0-9]{0,40}(20\d{2}|19\d{2})/i)?.[1];
   const planYear = explicitYear ? Number(explicitYear) : null;
-  const dateMatch = firstText.match(/(?:dates+(?:received|filed)|filings+date)s*[:-]?s*(d{1,2}/d{1,2}/d{4}|d{4}-d{2}-d{2})/i)?.[1] ?? null;
+  const dateMatch = firstText.match(/(?:date\s+(?:received|filed)|filing\s+date)\s*[:\-]?\s*(\d{1,2}\/\d{1,2}\/\d{4}|\d{4}-\d{2}-\d{2})/i)?.[1] ?? null;
   const filingDate = dateMatch ? normalizeDateSignal(dateMatch) : null;
-  const nameMatch = firstText.match(/names+ofs+plans*[:-]?s*(.{5,120}?)(?:plans+number|employer|sponsor|ein|$)/i);
-  const planName = nameMatch?.[1]?.replace(/s+/g, ' ').trim() ?? null;
+  const nameMatch = firstText.match(/name\s+of\s+plan\s*[:\-]?\s*(.{5,120}?)(?:plan\s+number|employer|sponsor|ein|$)/i);
+  const planName = nameMatch?.[1]?.replace(/\s+/g, ' ').trim() ?? null;
 
   return { filename, filingId, planNumber, planYear, filingDate, ein, planName };
 }

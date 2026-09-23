@@ -21,23 +21,23 @@ function groupLines(tokens: PositionedToken[]): TextLine[] {
   }
   for (const line of lines) {
     line.tokens.sort((a, b) => a.x - b.x);
-    line.text = line.tokens.map((token) => token.text).join(' ').replace(/s+/g, ' ').trim();
+    line.text = line.tokens.map((token) => token.text).join(' ').replace(/\s+/g, ' ').trim();
   }
   return lines.sort((a, b) => b.y - a.y);
 }
 
 function isTargetLine(text: string): boolean {
-  const normalized = text.toLowerCase().replace(/s+/g, ' ');
-  const hasReference = /1s*cs*(?s*9s*)?/i.test(normalized) || /1c9/i.test(normalized);
+  const normalized = text.toLowerCase().replace(/\s+/g, ' ');
+  const hasReference = /\b1\s*c\s*\(?\s*9\s*\)?\b/i.test(normalized) || /\b1c9\b/i.test(normalized);
   const hasLabel = /common/.test(normalized) && /(collective|trust)/.test(normalized);
   return hasReference || hasLabel;
 }
 
 function parseMoneyToken(text: string): { raw: string; value: number } | null {
   const trimmed = text.trim();
-  if (!/^$?(?-?[d,]+)?$/.test(trimmed)) return null;
+  if (!/^\$?\(?-?[\d,]+\)?$/.test(trimmed)) return null;
   const negative = trimmed.includes('(') || trimmed.includes('-');
-  const digits = trimmed.replace(/[^d]/g, '');
+  const digits = trimmed.replace(/[^\d]/g, '');
   if (!digits) return null;
   const value = Number(digits) * (negative ? -1 : 1);
   if (!Number.isSafeInteger(value)) return null;
@@ -73,7 +73,7 @@ function extractFromLine(page: PdfPageText, line: TextLine): Extracted5500Value[
 }
 
 export function extractScheduleH1c9(pages: PdfPageText[]): Extracted5500Value[] {
-  const schedulePages = pages.filter((page) => /schedules+h/i.test(page.text));
+  const schedulePages = pages.filter((page) => /schedule\s+h/i.test(page.text));
   const candidates = schedulePages.length ? schedulePages : pages;
 
   for (const page of candidates) {

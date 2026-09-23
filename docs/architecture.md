@@ -215,3 +215,4 @@ Rules:
 - every RAG answer must cite plan year, schedule/form, part, location, page, and source document;
 - embedding and model binaries are local, versioned, and stored with SHA-256 in `model_metadata`;
 - if no source supports a statement, the answer must say the evidence is unavailable.
+

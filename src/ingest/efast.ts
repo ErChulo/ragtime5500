@@ -23,7 +23,7 @@ function pick(raw: Record<string, string>, aliases: string[]): string | null {
 
 function numberOrNull(value: string | null): number | null {
   if (!value) return null;
-  const normalized = value.replace(/[$,%s]/g, '');
+  const normalized = value.replace(/[$,%\s]/g, '');
   if (!normalized) return null;
   const number = Number(normalized);
   return Number.isFinite(number) ? number : null;
@@ -36,14 +36,14 @@ function integerOrNull(value: string | null): number | null {
 
 export function normalizeDate(value: string | null): string | null {
   if (!value) return null;
-  const mdy = value.match(/^(d{1,2})/(d{1,2})/(d{4})$/);
+  const mdy = value.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
   if (!mdy) return value;
   return `${mdy[3]}-${mdy[1].padStart(2, '0')}-${mdy[2].padStart(2, '0')}`;
 }
 
 export function filingIdFromUrl(value: string | null): string | null {
   if (!value) return null;
-  const match = value.match(//([^/?#]+).pdf(?:[?#].*)?$/i);
+  const match = value.match(/\/([^/?#]+)\.pdf(?:[?#].*)?$/i);
   return match?.[1] ?? null;
 }
 
