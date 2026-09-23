@@ -79,7 +79,7 @@ export async function importEfastRows(caseName: string, stored: StoredFile, rows
                 JOIN plan p ON p.plan_id=py.plan_id
                 JOIN pension_case pc ON pc.case_id=p.case_id
                 WHERE pc.case_name=? AND p.plan_number=? AND py.year=?
-                ON CONFLICT(efast_filing_id) DO UPDATE SET
+                ON CONFLICT(efast_filing_id) WHERE efast_filing_id IS NOT NULL DO UPDATE SET
                   filing_date=excluded.filing_date, source_url=excluded.source_url`,
           bind: [row.dateReceived, row.filingId, row.sourceUrl, caseName, row.planNumber, row.planYear],
         },
