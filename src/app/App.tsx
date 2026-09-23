@@ -7,14 +7,15 @@ import { SqlConsole } from '../components/SqlConsole';
 import { HierarchyPanel } from '../components/HierarchyPanel';
 import { MatchReview } from '../components/MatchReview';
 import { ExtractionReview } from '../components/ExtractionReview';
-import { AppNavigation, appSections, type AppSection } from '../components/AppNavigation';
+import { AppNavigation, appSections } from '../components/AppNavigation';
 import { BackupRestorePanel } from '../components/BackupRestorePanel';
+import { useHashSection } from './routes';
 
 export default function App() {
   const [dbInfo, setDbInfo] = useState('Initializing SQLite…');
   const [dbReady, setDbReady] = useState(false);
   const [refreshToken, setRefreshToken] = useState(0);
-  const [activeSection, setActiveSection] = useState<AppSection>('workspace');
+  const [activeSection, navigate] = useHashSection();
   const refresh = () => setRefreshToken((value) => value + 1);
 
   useEffect(() => {
@@ -52,7 +53,7 @@ export default function App() {
 
       <div className="app-layout">
         <aside className="sidebar">
-          <AppNavigation value={activeSection} onChange={setActiveSection} />
+          <AppNavigation value={activeSection} onChange={navigate} />
           <div className="sidebar-footnote">
             <span className="sidebar-footnote-label">Local database</span>
             <span>{dbInfo}</span>

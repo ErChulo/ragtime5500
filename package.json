@@ -12,7 +12,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "audit:network": "node scripts/audit-network.mjs",
-    "check": "npm run test && npm run build && npm run audit:network"
+    "audit:singlefile": "node scripts/audit-singlefile.mjs",
+    "check": "npm run test && npm run build && npm run audit:network && npm run audit:singlefile"
   },
   "dependencies": {
     "@sqlite.org/sqlite-wasm": "3.53.4-build1",

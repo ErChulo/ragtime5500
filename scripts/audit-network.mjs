@@ -1,4 +1,4 @@
-import { readdir, readFile, stat } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
 import { extname, join, relative } from 'node:path';
 
 const ROOT = new URL('../', import.meta.url).pathname;
@@ -48,15 +48,12 @@ const html = await readFile(join(ROOT, 'index.html'), 'utf8');
 if (!/connect-src\s+'none'/.test(html)) violations.push("index.html: missing connect-src 'none'");
 if (!/script-src\s+'self'\s+'wasm-unsafe-eval'/.test(html)) violations.push("index.html: missing local WASM script policy");
 
-// Generated vendor JS may contain unreachable network fallbacks. The production proof
-// therefore audits rendered resource references + CSP, while runtime globals and CSP
-// independently deny connection APIs.
 try {
-  const distHtml = await readFile(join(ROOT, 'dist', 'index.html'), 'utf8');
-  if (/\b(?:src|href)\s*=\s*["']https?:\/\//i.test(distHtml)) violations.push('dist/index.html: remote resource reference');
-  if (!/connect-src\s+'none'/.test(distHtml)) violations.push("dist/index.html: missing connect-src 'none'");
+  const distHtml = await readFile(join(ROOT, 'dist', 'ragtime5500.html'), 'utf8');
+  if (!/connect-src\s+'none'/.test(distHtml)) violations.push("dist/ragtime5500.html: missing connect-src 'none'");
+  if (!/worker-src\s+'self'\s+blob:\s+data:/.test(distHtml)) violations.push('dist/ragtime5500.html: missing local worker policy');
 } catch {
-  // Dist is optional before the first dependency-backed build.
+  // Dist is optional before the first production build.
 }
 
 if (violations.length) {

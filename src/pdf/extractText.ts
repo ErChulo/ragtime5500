@@ -1,10 +1,9 @@
 import * as pdfjsLib from 'pdfjs-dist';
-import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.mjs?worker&url';
 import type { PdfPageText, PositionedToken } from '../types/domain';
-
-pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
+import { ensureLocalPdfWorker } from './pdfWorker';
 
 export async function extractPdfPages(bytes: Uint8Array): Promise<PdfPageText[]> {
+  ensureLocalPdfWorker();
   const loadingTask = pdfjsLib.getDocument({ data: bytes.slice() });
   const pdf = await loadingTask.promise;
   const pages: PdfPageText[] = [];

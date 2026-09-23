@@ -1,9 +1,8 @@
 import * as pdfjsLib from 'pdfjs-dist';
-import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.mjs?worker&url';
-
-pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
+import { ensureLocalPdfWorker } from './pdfWorker';
 
 export async function renderPdfPage(bytes: Uint8Array, pageNumber: number, canvas: HTMLCanvasElement): Promise<void> {
+  ensureLocalPdfWorker();
   const loadingTask = pdfjsLib.getDocument({ data: bytes.slice() });
   const pdf = await loadingTask.promise;
 

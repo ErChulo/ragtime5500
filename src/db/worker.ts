@@ -1,4 +1,5 @@
 /// <reference lib="webworker" />
+import sqlite3InitModule from '@sqlite.org/sqlite-wasm';
 import sqliteWasmBase64 from 'virtual:sqlite-wasm-bytes';
 import { migrations } from './migrations';
 
@@ -91,12 +92,10 @@ async function openDatabase(): Promise<void> {
       disable: { vfs: { opfs: true, 'opfs-wl': true, kvvfs: true } },
     };
 
-    const { default: sqlite3InitModule } = await import('@sqlite.org/sqlite-wasm');
-    // The package runtime accepts Emscripten module options although its current
-    // TypeScript declaration exposes a zero-argument initializer.
     const initWithLocalWasm = sqlite3InitModule as unknown as (
       config: { wasmBinary: Uint8Array },
     ) => Promise<any>;
+
     sqlite3 = await initWithLocalWasm({ wasmBinary: decodeBase64(sqliteWasmBase64) });
     pool = await sqlite3.installOpfsSAHPoolVfs({
       name: 'ragtime5500-sahpool',
