@@ -7,7 +7,7 @@ type BindValue = string | number | bigint | null | Uint8Array;
 type Bind = BindValue[] | Record<string, BindValue>;
 
 type Request =
-  | { id: number; type: 'init' }
+  | { id: number; type: 'init'; bytes?: ArrayBuffer }
   | { id: number; type: 'exec'; sql: string; bind?: Bind }
   | { id: number; type: 'transaction'; statements: Array<{ sql: string; bind?: Bind }> }
   | { id: number; type: 'diagnostics' }
@@ -28,9 +28,8 @@ interface Diagnostics {
   databaseBytes: number;
 }
 
-const DB_NAME = '/ragtime5500.sqlite3';
+const DB_NAME = 'ragtime5500.sqlite3';
 let sqlite3: any;
-let pool: any;
 let db: any;
 let openPromise: Promise<void> | null = null;
 
@@ -122,54 +121,77 @@ function assertHealthy(result: Diagnostics): void {
   }
 }
 
-async function openDatabaseOnce(): Promise<void> {
-  if (!sqlite3) {
-    const scope = globalThis as typeof globalThis & { sqlite3ApiConfig?: Record<string, unknown> };
-    scope.sqlite3ApiConfig = {
-      disable: { vfs: { opfs: true, 'opfs-wl': true, kvvfs: true } },
-    };
+async function initSqlite(): Promise<void> {
+  if (sqlite3) return;
 
-    const initWithLocalWasm = sqlite3InitModule as unknown as (
-      config: { wasmBinary: Uint8Array },
-    ) => Promise<any>;
+  const scope = globalThis as typeof globalThis & { sqlite3ApiConfig?: Record<string, unknown> };
+  scope.sqlite3ApiConfig = {
+    disable: { vfs: { opfs: true, 'opfs-wl': true, kvvfs: true } },
+  };
 
-    sqlite3 = await initWithLocalWasm({ wasmBinary: decodeBase64(sqliteWasmBase64) });
+  const initWithLocalWasm = sqlite3InitModule as unknown as (
+    config: { wasmBinary: Uint8Array },
+  ) => Promise<any>;
+
+  sqlite3 = await initWithLocalWasm({ wasmBinary: decodeBase64(sqliteWasmBase64) });
+}
+
+function openFromBytes(bytes?: ArrayBuffer): void {
+  if (db) db.close();
+
+  db = new sqlite3.oo1.DB(':memory:', 'c');
+
+  if (bytes && bytes.byteLength) {
+    const source = new Uint8Array(bytes);
+    const pointer = sqlite3.wasm.allocFromTypedArray(source);
+    const flags = sqlite3.capi.SQLITE_DESERIALIZE_FREEONCLOSE | sqlite3.capi.SQLITE_DESERIALIZE_RESIZEABLE;
+    const rc = sqlite3.capi.sqlite3_deserialize(
+      db.pointer,
+      'main',
+      pointer,
+      source.byteLength,
+      source.byteLength,
+      flags,
+    );
+    db.checkRc(rc);
   }
 
-  if (!pool) {
-    pool = await sqlite3.installOpfsSAHPoolVfs({
-      name: 'ragtime5500-sahpool',
-      directory: '.ragtime5500-sahpool',
-      initialCapacity: 8,
-    });
-    await pool.reserveMinimumCapacity();
-  }
+  db.exec('PRAGMA foreign_keys = ON');
+  db.exec('PRAGMA journal_mode = MEMORY');
+}
 
+async function openDatabaseOnce(bytes?: ArrayBuffer): Promise<void> {
+  await initSqlite();
   if (!db) {
-    db = new pool.OpfsSAHPoolDb(DB_NAME);
-    db.exec('PRAGMA foreign_keys = ON');
-    db.exec('PRAGMA journal_mode = DELETE');
+    openFromBytes(bytes);
     await applyMigrations();
   }
 }
 
-async function openDatabase(): Promise<void> {
+async function openDatabase(bytes?: ArrayBuffer): Promise<void> {
   if (db) return;
   if (!openPromise) {
-    openPromise = openDatabaseOnce().finally(() => {
+    openPromise = openDatabaseOnce(bytes).finally(() => {
       openPromise = null;
     });
   }
   await openPromise;
 }
 
+function exportDatabaseBytes(): ArrayBuffer {
+  const bytes = sqlite3.capi.sqlite3_js_db_export(db) as Uint8Array;
+  const copy = new Uint8Array(bytes.byteLength);
+  copy.set(bytes);
+  return copy.buffer;
+}
+
 async function handle(request: Request): Promise<unknown> {
   switch (request.type) {
     case 'init':
-      await openDatabase();
+      await openDatabase(request.bytes);
       return {
         sqliteVersion: sqlite3.version.libVersion,
-        persistence: 'OPFS opfs-sahpool',
+        persistence: 'IndexedDB snapshot',
         filename: DB_NAME,
         foreignKeys: db.selectValue('PRAGMA foreign_keys'),
       };
@@ -202,33 +224,23 @@ async function handle(request: Request): Promise<unknown> {
       await openDatabase();
       const result = diagnostics();
       assertHealthy(result);
-      const bytes = pool.exportFile(DB_NAME) as Uint8Array;
-      return bytes.slice().buffer;
+      return exportDatabaseBytes();
     }
 
     case 'restore': {
       await openDatabase();
-      const previous = (pool.exportFile(DB_NAME) as Uint8Array).slice();
+      const previous = exportDatabaseBytes();
 
       try {
-        db.close();
-        db = undefined;
-        pool.importDb(DB_NAME, new Uint8Array(request.bytes));
-        await openDatabase();
+        openFromBytes(request.bytes);
+        await applyMigrations();
         const result = diagnostics();
         assertHealthy(result);
         return { restored: true, diagnostics: result };
       } catch (error) {
         try {
-          if (db) db.close();
-        } catch {
-          // Continue with restoration of the previous known-good database.
-        }
-        db = undefined;
-
-        try {
-          pool.importDb(DB_NAME, previous);
-          await openDatabase();
+          openFromBytes(previous);
+          await applyMigrations();
           assertHealthy(diagnostics());
         } catch (rollbackError) {
           throw new Error(
