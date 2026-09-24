@@ -237,5 +237,5 @@ try {
   );
 } finally {
   if (browser) await stopBrowser(browser);
-  await rm(profileDir, { recursive: true, force: true });
+  await rm(profileDir, { recursive: true, force: true, maxRetries: 8, retryDelay: 250 });
 }
