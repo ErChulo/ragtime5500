@@ -26,11 +26,19 @@ const TEST_STEPS: TestStep[] = [
   },
   {
     title: 'Import the eFAST CSV',
-    action: 'Choose the local eFAST export CSV and import it.',
-    expected: 'Ragtime shows the imported row count and preserves the eFAST URL only as provenance text.',
-    proves: 'Ragtime can ingest and preserve the eFAST export without contacting eFAST.',
+    action: 'Choose the local eFAST export CSV and import it. Ragtime preserves every raw row first.',
+    expected: 'Ragtime shows the imported row count and sends you to row review. No plan-year or filing record is created yet.',
+    proves: 'Ragtime can ingest and preserve the eFAST export without contacting eFAST or assuming every row is your pension filing.',
     section: 'import',
     button: 'Go to import',
+  },
+  {
+    title: 'Review the CSV rows',
+    action: 'Review one CSV row at a time. Mark only the pension plan Form 5500 rows as Use as Form 5500; exclude other arrangements.',
+    expected: 'Included rows create expected filings. Excluded rows remain preserved but are not used for PDF matching.',
+    proves: 'Ragtime never silently treats every eFAST row as the target pension filing.',
+    section: 'import',
+    button: 'Go to row review',
   },
   {
     title: 'Import the local Form 5500 PDFs',
