@@ -31,6 +31,14 @@ The interface therefore follows these rules:
 
 For the complete manual walkthrough, see **[docs/testing-guide.md](docs/testing-guide.md)**.
 
+## Case = pension plan domain rule
+
+For Ragtime 5500, a **case is the pension plan being worked**. The user-facing hierarchy is:
+
+`Case → Plan Year → Filing`
+
+The legacy internal `plan` table is retained only as a relational compatibility layer for existing SQL/provenance joins. Ragtime automatically creates and maintains that one internal row; it is not a separate user concept or wizard step.
+
 ## Final-deliverable contract
 
 The production application is exactly one standalone file:
@@ -105,7 +113,7 @@ Use the step-by-step **[Manual Test Drive](docs/testing-guide.md)**. It is writt
 
 ## Milestone 1 scope
 
-- Case / Plan / Plan Year / Filing CRUD
+- Case (= one pension plan) / Plan Year / Filing CRUD
 - eFAST CSV import with raw rows preserved
 - bulk local PDF import
 - deterministic PDF-to-CSV matching
