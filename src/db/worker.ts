@@ -10,6 +10,7 @@ type Request =
   | { id: number; type: 'init'; bytes?: ArrayBuffer }
   | { id: number; type: 'exec'; sql: string; bind?: Bind }
   | { id: number; type: 'transaction'; statements: Array<{ sql: string; bind?: Bind }> }
+  | { id: number; type: 'reset' }
   | { id: number; type: 'diagnostics' }
   | { id: number; type: 'export' }
   | { id: number; type: 'restore'; bytes: ArrayBuffer }
@@ -215,6 +216,12 @@ async function handle(request: Request): Promise<unknown> {
         throw error;
       }
     }
+
+    case 'reset':
+      await initSqlite();
+      openFromBytes();
+      await applyMigrations();
+      return { reset: true, diagnostics: diagnostics() };
 
     case 'diagnostics':
       await openDatabase();
