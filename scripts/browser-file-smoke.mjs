@@ -160,7 +160,6 @@ async function launch() {
     '--disable-features=OptimizationHints,MediaRouter',
     '--remote-debugging-address=127.0.0.1',
     '--remote-debugging-port=0',
-    '--allow-file-access-from-files',
     `--user-data-dir=${profile}`,
     'about:blank',
   ], { stdio: ['ignore', 'ignore', 'pipe'] });
