@@ -35,9 +35,9 @@ For the complete manual walkthrough, see **[docs/testing-guide.md](docs/testing-
 
 The normal user workflow is intentionally linear:
 
-`Workspace → Case → eFAST CSV → Local PDFs → Review → Query / Report`
+`Workspace → Case → eFAST CSV → Review CSV rows → Local PDFs → Review evidence → Query / Report`
 
-The user creates the **Case only**. Ragtime then uses the eFAST CSV to create or match the case's plan years and expected Form 5500 filing records. Manual plan-year/filing creation is not part of the normal workflow.
+The user creates the **Case only**. Ragtime preserves every eFAST CSV row first. The user then reviews the CSV rows one at a time and explicitly marks which rows are the pension plan's Form 5500 filings. Only those confirmed rows create expected plan-year/filing records and become eligible for PDF matching. Other arrangements remain preserved but excluded. Manual plan-year/filing creation is not part of the normal workflow.
 
 ## Case = pension plan domain rule
 
@@ -122,7 +122,7 @@ Use the step-by-step **[Manual Test Drive](docs/testing-guide.md)**. It is writt
 ## Milestone 1 scope
 
 - Case (= one pension plan) setup; eFAST import creates Plan Year / Filing records automatically
-- eFAST CSV import with raw rows preserved
+- eFAST CSV import with every raw row preserved and explicit target/non-target row review before filing creation
 - bulk local PDF import
 - deterministic PDF-to-CSV matching
 - local PDF text extraction and page chunks
