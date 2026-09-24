@@ -209,8 +209,8 @@ try {
     secureContext: isSecureContext,
     openPicker: typeof window.showOpenFilePicker,
     savePicker: typeof window.showSaveFilePicker,
-    networkBadge: document.body?.innerText.includes('Network blocked'),
-    noWorkspaceBadge: document.body?.innerText.includes('No workspace open')
+    networkBadge: document.body?.innerText.includes('Offline'),
+    noWorkspaceBadge: document.body?.innerText.includes('Choose workspace')
   })`);
 
   if (!capabilities?.secureContext) {
