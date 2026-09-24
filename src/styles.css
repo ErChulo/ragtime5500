@@ -1195,3 +1195,7 @@ button.button-tertiary:hover:not(:disabled) {
   .guide-actions { grid-template-columns: 1fr; }
   .guide-actions > * { width: 100%; }
 }
+
+.context-progress-three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
