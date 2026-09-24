@@ -8,7 +8,7 @@ export interface AppSectionDefinition {
 
 export const appSections: AppSectionDefinition[] = [
   { id: 'home', label: 'Guide', description: 'Start here or return to the testing guide' },
-  { id: 'workspace', label: 'Case setup', description: 'Case → Plan → Year → Filing' },
+  { id: 'workspace', label: 'Case setup', description: 'Case → Plan Year → Filing' },
   { id: 'import', label: 'Import', description: 'eFAST CSV and local PDFs' },
   { id: 'review', label: 'Review', description: 'Match documents and verify extracted values' },
   { id: 'explore', label: 'Find values', description: 'Exact lines, concepts, and document text' },
