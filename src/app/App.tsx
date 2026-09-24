@@ -14,10 +14,13 @@ import { AuditHistoryPanel } from '../components/AuditHistoryPanel';
 import { DocumentSearchPanel } from '../components/DocumentSearchPanel';
 import { ConceptHistoryPanel } from '../components/ConceptHistoryPanel';
 import { useHashSection } from './routes';
+import { WorkspaceFileGate } from '../components/WorkspaceFileGate';
 
 export default function App() {
   const [dbInfo, setDbInfo] = useState('Initializing SQLite…');
   const [dbReady, setDbReady] = useState(false);
+  const [workspaceName, setWorkspaceName] = useState<string | null>(null);
+  const [workspaceStatus, setWorkspaceStatus] = useState('');
   const [refreshToken, setRefreshToken] = useState(0);
   const [activeSection, navigate] = useHashSection();
   const refresh = () => setRefreshToken((value) => value + 1);
@@ -26,11 +29,45 @@ export default function App() {
     db.init().then((info) => {
       setDbInfo(`SQLite ${info.sqliteVersion} · ${info.persistence} · foreign keys ${info.foreignKeys ? 'ON' : 'OFF'}`);
       setDbReady(true);
+      setWorkspaceStatus('SQLite is ready. Open or create a local workspace file.');
     }).catch((error) => {
       setDbInfo(`Database initialization failed: ${error instanceof Error ? error.message : String(error)}`);
       setDbReady(false);
     });
   }, []);
+
+
+  const openWorkspace = async () => {
+    setWorkspaceStatus('Opening local SQLite workspace…');
+    try {
+      const name = await db.openWorkspace();
+      setWorkspaceName(name);
+      setWorkspaceStatus(`Workspace opened: ${name}`);
+      refresh();
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        setWorkspaceStatus('Open workspace canceled.');
+      } else {
+        setWorkspaceStatus(error instanceof Error ? error.message : String(error));
+      }
+    }
+  };
+
+  const createWorkspace = async () => {
+    setWorkspaceStatus('Creating local SQLite workspace…');
+    try {
+      const name = await db.createWorkspace();
+      setWorkspaceName(name);
+      setWorkspaceStatus(`Workspace created: ${name}`);
+      refresh();
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        setWorkspaceStatus('Create workspace canceled.');
+      } else {
+        setWorkspaceStatus(error instanceof Error ? error.message : String(error));
+      }
+    }
+  };
 
   const section = appSections.find((item) => item.id === activeSection) ?? appSections[0];
 
@@ -44,23 +81,35 @@ export default function App() {
         </div>
         <div className="system-status" aria-label="Local security and database status">
           <span className="status-pill status-pill-secure"><span className="status-dot" />Network blocked</span>
-          <span className={`status-pill${dbReady ? ' status-pill-ready' : ''}`}>{dbReady ? 'Database ready' : 'Database starting'}</span>
+          <span className={`status-pill${dbReady ? ' status-pill-ready' : ''}`}>{dbReady ? 'SQLite ready' : 'SQLite starting'}</span>
+          <span className={`status-pill${workspaceName ? ' status-pill-ready' : ''}`}>{workspaceName ? `Workspace: ${workspaceName}` : 'No workspace open'}</span>
         </div>
       </header>
 
       <div className="security-strip">
         <strong>Air-gapped runtime</strong>
         <span>Local files only</span>
-        <span>SQLite + IndexedDB</span>
+        <span>SQLite workspace file</span>
         <span>eFAST URLs are provenance text only</span>
       </div>
 
+      {!workspaceName ? (
+        <WorkspaceFileGate
+          databaseReady={dbReady}
+          supported={dbReady ? db.supportsWorkspaceFiles() : false}
+          status={workspaceStatus}
+          onOpen={() => void openWorkspace()}
+          onCreate={() => void createWorkspace()}
+        />
+      ) : (
       <div className="app-layout">
         <aside className="sidebar">
           <AppNavigation value={activeSection} onChange={navigate} />
           <div className="sidebar-footnote">
             <span className="sidebar-footnote-label">Local database</span>
             <span>{dbInfo}</span>
+            <span className="sidebar-footnote-label">Workspace</span>
+            <span>{workspaceName}</span>
           </div>
         </aside>
 
@@ -105,6 +154,7 @@ export default function App() {
           ) : null}
         </main>
       </div>
+      )}
     </div>
   );
 }
