@@ -1,3 +1,5 @@
+import { useRef } from 'react';
+
 export type AppSection = 'home' | 'workspace' | 'import' | 'review' | 'explore' | 'database';
 
 export interface AppSectionDefinition {
@@ -7,16 +9,23 @@ export interface AppSectionDefinition {
 }
 
 export const appSections: AppSectionDefinition[] = [
-  { id: 'home', label: 'Guide', description: 'Start here or return to the testing guide' },
-  { id: 'workspace', label: 'Case setup', description: 'Case → Plan Year → Filing' },
-  { id: 'import', label: 'Import', description: 'eFAST CSV and local PDFs' },
-  { id: 'review', label: 'Review', description: 'Match documents and verify extracted values' },
-  { id: 'explore', label: 'Find values', description: 'Exact lines, concepts, and document text' },
+  { id: 'home', label: 'Guide', description: 'Return to the step-by-step guide' },
+  { id: 'workspace', label: 'Case', description: 'Create or choose the pension case' },
+  { id: 'import', label: 'Import files', description: 'Import the local eFAST CSV, then local PDFs' },
+  { id: 'review', label: 'Review', description: 'Resolve document matches and verify extracted values' },
+  { id: 'explore', label: 'Find values', description: 'Search exact Form 5500 values and local evidence' },
   { id: 'database', label: 'Backup', description: 'Backup, restore, and advanced database tools' },
 ];
 
 export function AppNavigation({ value, onChange }: { value: AppSection; onChange: (section: AppSection) => void }) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
   const current = appSections.find((section) => section.id === value) ?? appSections[0];
+
+  const goTo = (section: AppSection) => {
+    dialogRef.current?.close();
+    onChange(section);
+  };
+
   return (
     <nav className="app-nav-minimal" aria-label="Ragtime 5500 navigation">
       <button
@@ -33,23 +42,48 @@ export function AppNavigation({ value, onChange }: { value: AppSection; onChange
         <strong>{current.label}</strong>
       </div>
 
-      <details className="tools-menu">
-        <summary>All tools</summary>
-        <div className="tools-menu-popover">
-          {appSections.filter((section) => section.id !== 'home').map((section) => (
+      <button
+        type="button"
+        className="menu-open-button"
+        aria-haspopup="dialog"
+        onClick={() => dialogRef.current?.showModal()}
+      >
+        Go to…
+      </button>
+
+      <dialog ref={dialogRef} className="navigation-dialog" aria-labelledby="navigation-dialog-title">
+        <div className="navigation-dialog-card">
+          <div className="navigation-dialog-header">
+            <div>
+              <p className="eyebrow">Navigation</p>
+              <h2 id="navigation-dialog-title">Where do you want to go?</h2>
+            </div>
             <button
-              key={section.id}
               type="button"
-              className={value === section.id ? 'active' : ''}
-              aria-current={value === section.id ? 'page' : undefined}
-              onClick={() => onChange(section.id)}
+              className="dialog-close-button"
+              aria-label="Close navigation"
+              onClick={() => dialogRef.current?.close()}
             >
-              <strong>{section.label}</strong>
-              <span>{section.description}</span>
+              Close
             </button>
-          ))}
+          </div>
+
+          <div className="navigation-dialog-options">
+            {appSections.map((section) => (
+              <button
+                key={section.id}
+                type="button"
+                className={value === section.id ? 'active' : ''}
+                aria-current={value === section.id ? 'page' : undefined}
+                onClick={() => goTo(section.id)}
+              >
+                <strong>{section.label}</strong>
+                <span>{section.description}</span>
+              </button>
+            ))}
+          </div>
         </div>
-      </details>
+      </dialog>
     </nav>
   );
 }
