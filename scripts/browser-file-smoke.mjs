@@ -5,7 +5,7 @@ import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import http from 'node:http';
 
-const chrome = process.argv[2];
+const chrome = process.argv[2] || process.env.CHROME_PATH;
 if (!chrome) throw new Error('Usage: node scripts/browser-file-smoke.mjs <chrome-binary>');
 if (typeof WebSocket !== 'function') throw new Error('Node.js WebSocket global is required for the CDP smoke test.');
 
