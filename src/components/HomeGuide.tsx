@@ -17,12 +17,12 @@ interface TestStep {
 
 const TEST_STEPS: TestStep[] = [
   {
-    title: 'Create the filing context',
-    action: 'Create or select one Case, Plan Year, and Filing. In Ragtime, one case is one pension plan.',
-    expected: 'You finish with a single filing context selected.',
-    proves: 'Ragtime can maintain the authoritative case → plan year → filing hierarchy without asking you to create a duplicate Plan record.',
+    title: 'Create or choose the case',
+    action: 'Create or select the pension case. Do not create years or filings manually; the eFAST CSV will create those next.',
+    expected: 'You finish with one case selected and Ragtime sends you to eFAST import.',
+    proves: 'Ragtime treats one case as one pension plan and uses the eFAST CSV to populate plan years and expected filings.',
     section: 'workspace',
-    button: 'Go to case setup',
+    button: 'Go to case',
   },
   {
     title: 'Import the eFAST CSV',
@@ -158,7 +158,7 @@ export function HomeGuide({ workspaceName, onNavigate }: Props) {
 
         <button className="home-action" type="button" onClick={() => onNavigate('workspace')}>
           <strong>Set up or change a case</strong>
-          <span>Case → Plan Year → Filing, one decision at a time.</span>
+          <span>Case first; eFAST creates the years and filings.</span>
         </button>
 
         <button className="home-action" type="button" onClick={() => onNavigate('explore')}>
