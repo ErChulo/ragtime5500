@@ -42,82 +42,33 @@ export async function importEfastRows(caseName: string, stored: StoredFile, rows
       bind: [caseName],
     },
     {
-      sql: `INSERT INTO efast_import(source_document_id, row_count) VALUES(?,?)`,
-      bind: [sourceDocumentId, rows.length],
+      sql: `INSERT INTO efast_import(source_document_id,row_count,case_id)
+            SELECT ?,?,case_id FROM pension_case WHERE case_name=?`,
+      bind: [sourceDocumentId, rows.length, caseName],
     },
     {
       sql: `INSERT INTO audit_log(entity_type,entity_id,action,old_value,new_value)
-            SELECT 'EFAST_IMPORT',efast_import_id,'IMPORT',NULL,
-                   json_object('source_document_id',source_document_id,'row_count',row_count)
+            SELECT 'EFAST_IMPORT',efast_import_id,'IMPORT_RAW',NULL,
+                   json_object('source_document_id',source_document_id,'row_count',row_count,'review_required',1)
             FROM efast_import WHERE source_document_id=?`,
       bind: [sourceDocumentId],
     },
   ];
 
-  const distinctPlanNumbers = [...new Set(rows.map((row) => row.planNumber).filter((value): value is string => Boolean(value)))];
-  if (distinctPlanNumbers.length > 1) {
-    throw new Error('This eFAST CSV contains more than one plan number. Import one case/plan at a time.');
-  }
-
   for (const row of rows) {
-    if (row.planYear !== null) {
-      statements.push(
-        {
-          sql: `INSERT INTO plan(case_id,plan_name,plan_number)
-                SELECT pc.case_id,COALESCE(?,pc.case_name),?
-                FROM pension_case pc
-                WHERE pc.case_name=?
-                  AND NOT EXISTS (SELECT 1 FROM plan p WHERE p.case_id=pc.case_id)`,
-          bind: [row.planName, row.planNumber, caseName],
-        },
-        {
-          sql: `UPDATE plan
-                SET plan_name=COALESCE(?,plan_name),
-                    plan_number=COALESCE(?,plan_number),
-                    updated_at=CURRENT_TIMESTAMP
-                WHERE plan_id=(
-                  SELECT MIN(p.plan_id)
-                  FROM plan p JOIN pension_case pc ON pc.case_id=p.case_id
-                  WHERE pc.case_name=?
-                )`,
-          bind: [row.planName, row.planNumber, caseName],
-        },
-        {
-          sql: `INSERT INTO plan_year(plan_id,year)
-                SELECT MIN(p.plan_id), ?
-                FROM plan p JOIN pension_case pc ON pc.case_id=p.case_id
-                WHERE pc.case_name=?
-                HAVING MIN(p.plan_id) IS NOT NULL
-                ON CONFLICT(plan_id,year) DO NOTHING`,
-          bind: [row.planYear, caseName],
-        },
-        {
-          sql: `INSERT INTO filing(plan_year_id,filing_date,efast_filing_id,source_url,filing_status)
-                SELECT py.plan_year_id, ?, ?, ?, 'EXPECTED'
-                FROM plan_year py
-                JOIN plan p ON p.plan_id=py.plan_id
-                JOIN pension_case pc ON pc.case_id=p.case_id
-                WHERE pc.case_name=? AND py.year=?
-                  AND p.plan_id=(SELECT MIN(p2.plan_id) FROM plan p2 WHERE p2.case_id=pc.case_id)
-                ON CONFLICT(efast_filing_id) WHERE efast_filing_id IS NOT NULL DO UPDATE SET
-                  filing_date=excluded.filing_date,source_url=excluded.source_url`,
-          bind: [row.dateReceived, row.filingId, row.sourceUrl, caseName, row.planYear],
-        },
-      );
-    }
-
     statements.push({
       sql: `INSERT INTO efast_import_row(
               efast_import_id,row_number,plan_number,plan_name,plan_year,date_received,plan_codes,
-              participants,participants_eoy,assets_boy,assets_eoy,source_url,raw_row_json,raw_record_text,matched_filing_id
+              participants,participants_eoy,assets_boy,assets_eoy,source_url,raw_row_json,raw_record_text,
+              matched_filing_id,classification_status,classification_reason,included_for_matching,user_verified
             )
-            SELECT ei.efast_import_id,?,?,?,?,?,?,?,?,?,?,?,?,?,
-                   (SELECT filing_id FROM filing WHERE efast_filing_id=?)
+            SELECT ei.efast_import_id,?,?,?,?,?,?,?,?,?,?,?,?,?,NULL,
+                   'NEEDS_REVIEW','Imported raw row; user classification required',0,0
             FROM efast_import ei WHERE ei.source_document_id=?`,
       bind: [
         row.rowNumber, row.planNumber, row.planName, row.planYear, row.dateReceived, row.planCodes,
         row.participants, row.participantsEoy, row.assetsBoy, row.assetsEoy, row.sourceUrl,
-        JSON.stringify(row.raw), row.rawRecordText, row.filingId, sourceDocumentId,
+        JSON.stringify(row.raw), row.rawRecordText, sourceDocumentId,
       ],
     });
   }
@@ -130,6 +81,140 @@ export async function importEfastRows(caseName: string, stored: StoredFile, rows
   return imported[0].efast_import_id;
 }
 
+export async function listEfastRowsForReview(efastImportId: number): Promise<Array<Record<string, unknown>>> {
+  return db.exec(`
+    SELECT import_row_id,row_number,plan_number,plan_name,plan_year,date_received,plan_codes,
+           participants,participants_eoy,assets_boy,assets_eoy,source_url,
+           classification_status,classification_reason,included_for_matching,user_verified
+    FROM efast_import_row
+    WHERE efast_import_id=?
+    ORDER BY row_number
+  `, [efastImportId]);
+}
+
+export async function classifyEfastRow(
+  importRowId: number,
+  include: boolean,
+): Promise<void> {
+  const rows = await db.exec<Record<string, unknown>>(`
+    SELECT er.*, ei.case_id, pc.case_name
+    FROM efast_import_row er
+    JOIN efast_import ei ON ei.efast_import_id=er.efast_import_id
+    LEFT JOIN pension_case pc ON pc.case_id=ei.case_id
+    WHERE er.import_row_id=?
+  `, [importRowId]);
+  const row = rows[0];
+  if (!row) throw new Error('eFAST row not found.');
+
+  if (!include) {
+    await db.transaction([
+      {
+        sql: `UPDATE efast_import_row
+              SET classification_status='NON_TARGET',
+                  classification_reason='User excluded this row from the case filing set',
+                  included_for_matching=0,
+                  user_verified=1,
+                  matched_filing_id=NULL
+              WHERE import_row_id=?`,
+        bind: [importRowId],
+      },
+      {
+        sql: `INSERT INTO audit_log(entity_type,entity_id,action,old_value,new_value)
+              VALUES('EFAST_IMPORT_ROW',?,'CLASSIFY_NON_TARGET',NULL,
+                     json_object('included_for_matching',0,'user_verified',1))`,
+        bind: [importRowId],
+      },
+    ]);
+    return;
+  }
+
+  const planYear = row.plan_year == null ? null : Number(row.plan_year);
+  if (planYear === null || !Number.isFinite(planYear)) {
+    throw new Error('This row has no usable plan year and cannot be included as a target filing.');
+  }
+
+  const caseId = row.case_id == null ? null : Number(row.case_id);
+  if (caseId === null) throw new Error('This eFAST import is not associated with a case.');
+
+  const planId = await ensureCasePlan(caseId);
+
+  await db.transaction([
+    {
+      sql: `UPDATE plan
+            SET plan_name=COALESCE(?,plan_name),
+                plan_number=COALESCE(?,plan_number),
+                updated_at=CURRENT_TIMESTAMP
+            WHERE plan_id=?`,
+      bind: [
+        row.plan_name == null ? null : String(row.plan_name),
+        row.plan_number == null ? null : String(row.plan_number),
+        planId,
+      ],
+    },
+    {
+      sql: `INSERT INTO plan_year(plan_id,year)
+            VALUES(?,?)
+            ON CONFLICT(plan_id,year) DO NOTHING`,
+      bind: [planId, planYear],
+    },
+    {
+      sql: `INSERT INTO filing(plan_year_id,filing_date,efast_filing_id,source_url,filing_status)
+            SELECT py.plan_year_id,?,?,?,'EXPECTED'
+            FROM plan_year py
+            WHERE py.plan_id=? AND py.year=?
+              AND NOT EXISTS (
+                SELECT 1 FROM filing f
+                WHERE (? IS NOT NULL AND f.efast_filing_id=?)
+                   OR (? IS NULL AND f.plan_year_id=py.plan_year_id AND f.source_url IS ?)
+              )`,
+      bind: [
+        row.date_received == null ? null : String(row.date_received),
+        row.efast_filing_id == null ? null : String(row.efast_filing_id),
+        row.source_url == null ? null : String(row.source_url),
+        planId,
+        planYear,
+        row.efast_filing_id == null ? null : String(row.efast_filing_id),
+        row.efast_filing_id == null ? null : String(row.efast_filing_id),
+        row.efast_filing_id == null ? null : String(row.efast_filing_id),
+        row.source_url == null ? null : String(row.source_url),
+      ],
+    },
+    {
+      sql: `UPDATE efast_import_row
+            SET matched_filing_id=(
+                  SELECT f.filing_id
+                  FROM filing f
+                  JOIN plan_year py ON py.plan_year_id=f.plan_year_id
+                  WHERE py.plan_id=? AND py.year=?
+                    AND ((? IS NOT NULL AND f.efast_filing_id=?)
+                         OR (? IS NULL AND f.source_url IS ?))
+                  ORDER BY f.filing_id DESC
+                  LIMIT 1
+                ),
+                classification_status='TARGET_FORM_5500',
+                classification_reason='User confirmed this row as a target Form 5500 filing',
+                included_for_matching=1,
+                user_verified=1
+            WHERE import_row_id=?`,
+      bind: [
+        planId,
+        planYear,
+        row.efast_filing_id == null ? null : String(row.efast_filing_id),
+        row.efast_filing_id == null ? null : String(row.efast_filing_id),
+        row.efast_filing_id == null ? null : String(row.efast_filing_id),
+        row.source_url == null ? null : String(row.source_url),
+        importRowId,
+      ],
+    },
+    {
+      sql: `INSERT INTO audit_log(entity_type,entity_id,action,old_value,new_value)
+            VALUES('EFAST_IMPORT_ROW',?,'CLASSIFY_TARGET',NULL,
+                   json_object('included_for_matching',1,'user_verified',1,'plan_year',?))`,
+      bind: [importRowId, planYear],
+    },
+  ]);
+}
+
 export async function listMatchableRows(): Promise<MatchableEfastRow[]> {
   const rows = await db.exec<Record<string, unknown>>(`
     SELECT er.import_row_id, er.plan_number, er.plan_name, er.plan_year, er.date_received,
@@ -138,7 +223,8 @@ export async function listMatchableRows(): Promise<MatchableEfastRow[]> {
     LEFT JOIN filing f ON f.filing_id=er.matched_filing_id
     LEFT JOIN plan_year py ON py.plan_year_id=f.plan_year_id
     LEFT JOIN plan p ON p.plan_id=py.plan_id
-    WHERE f.source_document_id IS NULL OR f.filing_id IS NULL
+    WHERE er.included_for_matching=1
+      AND (f.source_document_id IS NULL OR f.filing_id IS NULL)
   `);
 
   return rows.map((row) => ({
