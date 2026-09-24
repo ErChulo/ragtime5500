@@ -3,6 +3,7 @@ import { hashForSection, sectionFromHash } from '../src/app/routes';
 
 describe('standalone hash routing', () => {
   it('maps valid section hashes to app sections', () => {
+    expect(sectionFromHash('#/home')).toBe('home');
     expect(sectionFromHash('#/workspace')).toBe('workspace');
     expect(sectionFromHash('#/import')).toBe('import');
     expect(sectionFromHash('#/review')).toBe('review');
@@ -10,9 +11,9 @@ describe('standalone hash routing', () => {
     expect(sectionFromHash('#/database')).toBe('database');
   });
 
-  it('falls back to workspace for missing or unknown routes', () => {
-    expect(sectionFromHash('')).toBe('workspace');
-    expect(sectionFromHash('#/unknown')).toBe('workspace');
+  it('falls back to Guide home for missing or unknown routes', () => {
+    expect(sectionFromHash('')).toBe('home');
+    expect(sectionFromHash('#/unknown')).toBe('home');
   });
 
   it('creates file-protocol-safe hash routes', () => {
