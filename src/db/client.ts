@@ -1,5 +1,4 @@
 import dbWorkerUrl from './worker?worker&url';
-import { readSqliteSnapshot, writeSqliteSnapshot } from '../storage/indexedDb';
 
 type BindValue = string | number | bigint | null | Uint8Array;
 export type SqlBind = BindValue[] | Record<string, BindValue>;
@@ -21,6 +20,29 @@ interface Pending {
 type WorkerResponse =
   | { id: number; ok: true; result: unknown }
   | { id: number; ok: false; error: string };
+
+interface WorkspaceWritable {
+  write(data: BufferSource | Blob | string): Promise<void>;
+  close(): Promise<void>;
+}
+
+interface WorkspaceFileHandle {
+  readonly name: string;
+  getFile(): Promise<File>;
+  createWritable(): Promise<WorkspaceWritable>;
+}
+
+interface FilePickerWindow extends Window {
+  showOpenFilePicker?: (options?: Record<string, unknown>) => Promise<WorkspaceFileHandle[]>;
+  showSaveFilePicker?: (options?: Record<string, unknown>) => Promise<WorkspaceFileHandle>;
+}
+
+const PICKER_TYPES = [{
+  description: 'Ragtime 5500 SQLite workspace',
+  accept: {
+    'application/x-sqlite3': ['.sqlite3', '.sqlite', '.db'],
+  },
+}];
 
 function workerFromBundledUrl(url: string): Worker {
   if (!url.startsWith('data:')) {
@@ -53,6 +75,7 @@ export class DbClient {
   private readonly worker: Worker;
   private nextId = 1;
   private readonly pending = new Map<number, Pending>();
+  private workspaceHandle: WorkspaceFileHandle | null = null;
   private persistChain: Promise<void> = Promise.resolve();
 
   constructor() {
@@ -79,32 +102,97 @@ export class DbClient {
     });
   }
 
+  private requireWorkspace(): WorkspaceFileHandle {
+    if (!this.workspaceHandle) {
+      throw new Error('Open or create a Ragtime workspace before changing data.');
+    }
+    return this.workspaceHandle;
+  }
+
   private persistSnapshot(): Promise<void> {
+    const handle = this.requireWorkspace();
     this.persistChain = this.persistChain.then(async () => {
       const bytes = await this.request<ArrayBuffer>({ type: 'export' });
-      await writeSqliteSnapshot(bytes);
+      const writable = await handle.createWritable();
+      try {
+        await writable.write(new Uint8Array(bytes));
+      } finally {
+        await writable.close();
+      }
     });
     return this.persistChain;
   }
 
   async init(): Promise<{ sqliteVersion: string; persistence: string; filename: string; foreignKeys: number }> {
-    const snapshot = await readSqliteSnapshot();
-    const transfer = snapshot ? [snapshot] : [];
-    const info = await this.request<{ sqliteVersion: string; persistence: string; filename: string; foreignKeys: number }>(
-      { type: 'init', bytes: snapshot ?? undefined },
-      transfer,
-    );
+    return this.request({ type: 'init' });
+  }
+
+  supportsWorkspaceFiles(): boolean {
+    const pickerWindow = window as FilePickerWindow;
+    return typeof pickerWindow.showOpenFilePicker === 'function' && typeof pickerWindow.showSaveFilePicker === 'function';
+  }
+
+  hasWorkspace(): boolean {
+    return this.workspaceHandle !== null;
+  }
+
+  workspaceName(): string | null {
+    return this.workspaceHandle?.name ?? null;
+  }
+
+  async createWorkspace(suggestedName = 'ragtime5500-workspace.sqlite3'): Promise<string> {
+    const pickerWindow = window as FilePickerWindow;
+    if (typeof pickerWindow.showSaveFilePicker !== 'function') {
+      throw new Error('This Chrome installation does not expose the local file workspace API required by the standalone app.');
+    }
+
+    const handle = await pickerWindow.showSaveFilePicker({
+      id: 'ragtime5500-workspace',
+      suggestedName,
+      types: PICKER_TYPES,
+      excludeAcceptAllOption: false,
+    });
+
+    await this.request({ type: 'reset' });
+    this.workspaceHandle = handle;
     await this.persistSnapshot();
-    return info;
+    return handle.name;
+  }
+
+  async openWorkspace(): Promise<string> {
+    const pickerWindow = window as FilePickerWindow;
+    if (typeof pickerWindow.showOpenFilePicker !== 'function') {
+      throw new Error('This Chrome installation does not expose the local file workspace API required by the standalone app.');
+    }
+
+    const handles = await pickerWindow.showOpenFilePicker({
+      id: 'ragtime5500-workspace',
+      multiple: false,
+      types: PICKER_TYPES,
+      excludeAcceptAllOption: false,
+    });
+    const handle = handles[0];
+    if (!handle) throw new Error('No workspace file was selected.');
+
+    const file = await handle.getFile();
+    const bytes = await file.arrayBuffer();
+    if (!bytes.byteLength) throw new Error('The selected workspace file is empty.');
+
+    await this.request({ type: 'restore', bytes }, [bytes]);
+    this.workspaceHandle = handle;
+    return handle.name;
   }
 
   async exec<T extends Record<string, unknown> = Record<string, unknown>>(sql: string, bind?: SqlBind): Promise<T[]> {
+    const mutating = !looksReadOnly(sql);
+    if (mutating) this.requireWorkspace();
     const rows = await this.request<T[]>({ type: 'exec', sql, bind });
-    if (!looksReadOnly(sql)) await this.persistSnapshot();
+    if (mutating) await this.persistSnapshot();
     return rows;
   }
 
   async transaction(statements: Array<{ sql: string; bind?: SqlBind }>): Promise<unknown[][]> {
+    this.requireWorkspace();
     const results = await this.request<unknown[][]>({ type: 'transaction', statements });
     await this.persistSnapshot();
     return results;
@@ -119,13 +207,14 @@ export class DbClient {
   }
 
   async restoreDatabase(bytes: ArrayBuffer): Promise<{ restored: boolean; diagnostics: DbDiagnostics }> {
+    this.requireWorkspace();
     const result = await this.request<{ restored: boolean; diagnostics: DbDiagnostics }>({ type: 'restore', bytes }, [bytes]);
     await this.persistSnapshot();
     return result;
   }
 
   async close(): Promise<{ closed: boolean }> {
-    await this.persistSnapshot();
+    if (this.workspaceHandle) await this.persistSnapshot();
     return this.request({ type: 'close' });
   }
 }
