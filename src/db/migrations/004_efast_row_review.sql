@@ -4,6 +4,8 @@
 
 ALTER TABLE efast_import ADD COLUMN case_id INTEGER REFERENCES pension_case(case_id) ON DELETE CASCADE;
 
+ALTER TABLE efast_import_row ADD COLUMN efast_filing_id TEXT;
+
 ALTER TABLE efast_import_row ADD COLUMN classification_status TEXT NOT NULL DEFAULT 'NEEDS_REVIEW'
   CHECK(classification_status IN ('NEEDS_REVIEW','TARGET_FORM_5500','NON_TARGET'));
 
