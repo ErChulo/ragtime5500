@@ -1288,3 +1288,67 @@ button.button-tertiary:hover:not(:disabled) {
     width: calc(100vw - 1rem);
   }
 }
+
+.efast-review-card {
+  max-width: 760px;
+  margin-inline: auto;
+}
+.review-progress-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: .75rem;
+  margin-bottom: .9rem;
+}
+.review-progress-line h2 {
+  margin: .1rem 0 0;
+  font-size: 1.15rem;
+}
+.review-progress-line > strong {
+  color: var(--muted);
+  font-size: .74rem;
+  white-space: nowrap;
+}
+.efast-row-summary {
+  padding: .8rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: #080d13;
+}
+.efast-row-summary dl {
+  margin: 0;
+  display: grid;
+  gap: .55rem;
+}
+.efast-row-summary dl > div {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  gap: .65rem;
+}
+.efast-row-summary dt {
+  color: var(--muted);
+  font-size: .7rem;
+  font-weight: 700;
+}
+.efast-row-summary dd {
+  margin: 0;
+  color: var(--text);
+  font-size: .8rem;
+  overflow-wrap: anywhere;
+}
+.review-question {
+  margin: .85rem 0 0;
+  color: var(--muted-strong);
+  font-size: .8rem;
+  line-height: 1.55;
+}
+.decision-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: .55rem;
+  margin-top: .9rem;
+}
+@media (max-width: 640px) {
+  .efast-row-summary dl > div { grid-template-columns: 1fr; gap: .15rem; }
+  .decision-actions { grid-template-columns: 1fr; }
+}
