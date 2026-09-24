@@ -522,8 +522,8 @@ async function secondRun() {
     await evaluate(session.cdp, `Array.from(document.querySelectorAll('button')).find((button) => button.textContent.trim() === 'Run integrity check')?.click()`);
     await waitFor(
       session.cdp,
-      `document.body.innerText.includes('PASS — SQLite reopened from OPFS')`,
-      'OPFS reopen and integrity check',
+      `document.body.innerText.includes('PASS — SQLite reopened from IndexedDB')`,
+      'IndexedDB reopen and integrity check',
       20000,
     );
 
@@ -572,7 +572,7 @@ async function secondRun() {
 try {
   await firstRun();
   await secondRun();
-  process.stdout.write('FILE-BROWSER SMOKE: PASS — direct file startup, synthetic CSV/PDF import, automatic matching, 1C9 extraction, SQL provenance retrieval, OPFS browser-restart persistence, integrity reopen, and zero outbound HTTP(S).\n');
+  process.stdout.write('FILE-BROWSER SMOKE: PASS — direct file startup, synthetic CSV/PDF import, automatic matching, 1C9 extraction, SQL provenance retrieval, IndexedDB browser-restart persistence, integrity reopen, and zero outbound HTTP(S).\n');
 } finally {
   await rm(profile, { recursive: true, force: true });
 }
