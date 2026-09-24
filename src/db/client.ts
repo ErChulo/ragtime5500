@@ -1,4 +1,6 @@
 import dbWorkerUrl from './worker?worker&url';
+import { readSqliteSnapshot, writeSqliteSnapshot } from '../storage/indexedDb';
+
 type BindValue = string | number | bigint | null | Uint8Array;
 export type SqlBind = BindValue[] | Record<string, BindValue>;
 
@@ -20,7 +22,6 @@ type WorkerResponse =
   | { id: number; ok: true; result: unknown }
   | { id: number; ok: false; error: string };
 
-
 function workerFromBundledUrl(url: string): Worker {
   if (!url.startsWith('data:')) {
     return new Worker(url, { name: 'ragtime5500-db' });
@@ -37,19 +38,22 @@ function workerFromBundledUrl(url: string): Worker {
     bytes[index] = binary.charCodeAt(index);
   }
 
-  // Chrome rejects top-level module workers launched from a file:// document
-  // because file URLs have opaque origins. The production worker is emitted as
-  // a self-contained classic IIFE, then rehydrated into a blob: URL here.
   const blobUrl = URL.createObjectURL(new Blob([bytes], { type: 'text/javascript' }));
   const worker = new Worker(blobUrl, { name: 'ragtime5500-db' });
   worker.addEventListener('error', () => URL.revokeObjectURL(blobUrl), { once: true });
   return worker;
 }
 
+function looksReadOnly(sql: string): boolean {
+  const normalized = sql.replace(/^\s*(?:--[^\n]*\n|\/\*[\s\S]*?\*\/\s*)*/g, '').trimStart();
+  return /^(?:SELECT|WITH|PRAGMA|EXPLAIN)\b/i.test(normalized);
+}
+
 export class DbClient {
   private readonly worker: Worker;
   private nextId = 1;
   private readonly pending = new Map<number, Pending>();
+  private persistChain: Promise<void> = Promise.resolve();
 
   constructor() {
     this.worker = workerFromBundledUrl(dbWorkerUrl);
@@ -75,16 +79,35 @@ export class DbClient {
     });
   }
 
-  init(): Promise<{ sqliteVersion: string; persistence: string; filename: string; foreignKeys: number }> {
-    return this.request({ type: 'init' });
+  private persistSnapshot(): Promise<void> {
+    this.persistChain = this.persistChain.then(async () => {
+      const bytes = await this.request<ArrayBuffer>({ type: 'export' });
+      await writeSqliteSnapshot(bytes);
+    });
+    return this.persistChain;
   }
 
-  exec<T extends Record<string, unknown> = Record<string, unknown>>(sql: string, bind?: SqlBind): Promise<T[]> {
-    return this.request({ type: 'exec', sql, bind });
+  async init(): Promise<{ sqliteVersion: string; persistence: string; filename: string; foreignKeys: number }> {
+    const snapshot = await readSqliteSnapshot();
+    const transfer = snapshot ? [snapshot] : [];
+    const info = await this.request<{ sqliteVersion: string; persistence: string; filename: string; foreignKeys: number }>(
+      { type: 'init', bytes: snapshot ?? undefined },
+      transfer,
+    );
+    await this.persistSnapshot();
+    return info;
   }
 
-  transaction(statements: Array<{ sql: string; bind?: SqlBind }>): Promise<unknown[][]> {
-    return this.request({ type: 'transaction', statements });
+  async exec<T extends Record<string, unknown> = Record<string, unknown>>(sql: string, bind?: SqlBind): Promise<T[]> {
+    const rows = await this.request<T[]>({ type: 'exec', sql, bind });
+    if (!looksReadOnly(sql)) await this.persistSnapshot();
+    return rows;
+  }
+
+  async transaction(statements: Array<{ sql: string; bind?: SqlBind }>): Promise<unknown[][]> {
+    const results = await this.request<unknown[][]>({ type: 'transaction', statements });
+    await this.persistSnapshot();
+    return results;
   }
 
   diagnostics(): Promise<DbDiagnostics> {
@@ -95,11 +118,14 @@ export class DbClient {
     return this.request({ type: 'export' });
   }
 
-  restoreDatabase(bytes: ArrayBuffer): Promise<{ restored: boolean; diagnostics: DbDiagnostics }> {
-    return this.request({ type: 'restore', bytes }, [bytes]);
+  async restoreDatabase(bytes: ArrayBuffer): Promise<{ restored: boolean; diagnostics: DbDiagnostics }> {
+    const result = await this.request<{ restored: boolean; diagnostics: DbDiagnostics }>({ type: 'restore', bytes }, [bytes]);
+    await this.persistSnapshot();
+    return result;
   }
 
-  close(): Promise<{ closed: boolean }> {
+  async close(): Promise<{ closed: boolean }> {
+    await this.persistSnapshot();
     return this.request({ type: 'close' });
   }
 }
