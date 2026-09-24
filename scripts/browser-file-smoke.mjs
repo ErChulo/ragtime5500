@@ -174,8 +174,8 @@ async function launch() {
   });
 
   const timer = setTimeout(() => {
-    rejectDevTools(new Error('Chrome did not announce a DevTools endpoint within 10 seconds.'));
-  }, 10000);
+    rejectDevTools(new Error('Chrome did not announce a DevTools endpoint within 30 seconds.'));
+  }, 30000);
 
   child.stderr.on('data', (chunk) => {
     stderr += String(chunk);
