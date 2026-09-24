@@ -31,6 +31,14 @@ The interface therefore follows these rules:
 
 For the complete manual walkthrough, see **[docs/testing-guide.md](docs/testing-guide.md)**.
 
+## Primary user workflow
+
+The normal user workflow is intentionally linear:
+
+`Workspace → Case → eFAST CSV → Local PDFs → Review → Query / Report`
+
+The user creates the **Case only**. Ragtime then uses the eFAST CSV to create or match the case's plan years and expected Form 5500 filing records. Manual plan-year/filing creation is not part of the normal workflow.
+
 ## Case = pension plan domain rule
 
 For Ragtime 5500, a **case is the pension plan being worked**. The user-facing hierarchy is:
@@ -113,7 +121,7 @@ Use the step-by-step **[Manual Test Drive](docs/testing-guide.md)**. It is writt
 
 ## Milestone 1 scope
 
-- Case (= one pension plan) / Plan Year / Filing CRUD
+- Case (= one pension plan) setup; eFAST import creates Plan Year / Filing records automatically
 - eFAST CSV import with raw rows preserved
 - bulk local PDF import
 - deterministic PDF-to-CSV matching
