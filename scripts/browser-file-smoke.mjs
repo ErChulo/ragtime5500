@@ -491,7 +491,7 @@ async function firstRun() {
       }
       resolve(result);
     })`, true).catch((error) => ({ error: String(error) }));
-    throw new Error(`${error instanceof Error ? error.message : String(error)}\nBrowser snapshot:\n${snapshot}\nBrowser messages:\n${browserMessages.join('\n')}\nCompiled source snippet:\n${snippet}\nPrivate-field diagnostics:\n${fieldDiagnostics}\nChrome stderr:\n${session.stderr()}`);
+    throw new Error(`${error instanceof Error ? error.message : String(error)}\nBrowser snapshot:\n${snapshot}\nBrowser messages:\n${browserMessages.join('\n')}\nCompiled source snippet:\n${snippet}\nPrivate-field diagnostics:\n${fieldDiagnostics}\nFILE CAPABILITY DIAGNOSTICS:\n${JSON.stringify(capabilityDiagnostics)}\nChrome stderr:\n${session.stderr()}`);
   } finally {
     await closeChrome(session);
   }
