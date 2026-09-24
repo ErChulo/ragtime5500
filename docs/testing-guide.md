@@ -59,10 +59,9 @@ Use **Guide** at the top to return to the instructions whenever you lose your pl
 
 Create or select, in order:
 
-1. Case
-2. Plan
-3. Plan Year
-4. Filing
+1. Case (the pension plan)
+2. Plan Year
+3. Filing
 
 Only the current decision should be visible. Optional edit/delete fields should stay collapsed.
 
@@ -70,7 +69,7 @@ Only the current decision should be visible. Optional edit/delete fields should 
 
 **This proves:** Ragtime stores the authoritative hierarchy:
 
-`Case → Plan → Plan Year → Filing`
+`Case → Plan Year → Filing`
 
 ## Test 5 — Import the eFAST CSV
 
