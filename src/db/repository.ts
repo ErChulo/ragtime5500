@@ -54,34 +54,54 @@ export async function importEfastRows(caseName: string, stored: StoredFile, rows
     },
   ];
 
+  const distinctPlanNumbers = [...new Set(rows.map((row) => row.planNumber).filter((value): value is string => Boolean(value)))];
+  if (distinctPlanNumbers.length > 1) {
+    throw new Error('This eFAST CSV contains more than one plan number. Import one case/plan at a time.');
+  }
+
   for (const row of rows) {
-    if (row.planName && row.planNumber && row.planYear !== null) {
+    if (row.planYear !== null) {
       statements.push(
         {
-          sql: `INSERT INTO plan(case_id, plan_name, plan_number)
-                SELECT case_id, ?, ? FROM pension_case WHERE case_name = ?
-                ON CONFLICT(case_id, plan_number) DO UPDATE SET
-                  plan_name=excluded.plan_name, updated_at=CURRENT_TIMESTAMP`,
+          sql: `INSERT INTO plan(case_id,plan_name,plan_number)
+                SELECT pc.case_id,COALESCE(?,pc.case_name),?
+                FROM pension_case pc
+                WHERE pc.case_name=?
+                  AND NOT EXISTS (SELECT 1 FROM plan p WHERE p.case_id=pc.case_id)`,
           bind: [row.planName, row.planNumber, caseName],
         },
         {
-          sql: `INSERT INTO plan_year(plan_id, year)
-                SELECT p.plan_id, ?
-                FROM plan p JOIN pension_case pc ON pc.case_id=p.case_id
-                WHERE pc.case_name=? AND p.plan_number=?
-                ON CONFLICT(plan_id, year) DO NOTHING`,
-          bind: [row.planYear, caseName, row.planNumber],
+          sql: `UPDATE plan
+                SET plan_name=COALESCE(?,plan_name),
+                    plan_number=COALESCE(?,plan_number),
+                    updated_at=CURRENT_TIMESTAMP
+                WHERE plan_id=(
+                  SELECT MIN(p.plan_id)
+                  FROM plan p JOIN pension_case pc ON pc.case_id=p.case_id
+                  WHERE pc.case_name=?
+                )`,
+          bind: [row.planName, row.planNumber, caseName],
         },
         {
-          sql: `INSERT INTO filing(plan_year_id, filing_date, efast_filing_id, source_url, filing_status)
+          sql: `INSERT INTO plan_year(plan_id,year)
+                SELECT MIN(p.plan_id), ?
+                FROM plan p JOIN pension_case pc ON pc.case_id=p.case_id
+                WHERE pc.case_name=?
+                HAVING MIN(p.plan_id) IS NOT NULL
+                ON CONFLICT(plan_id,year) DO NOTHING`,
+          bind: [row.planYear, caseName],
+        },
+        {
+          sql: `INSERT INTO filing(plan_year_id,filing_date,efast_filing_id,source_url,filing_status)
                 SELECT py.plan_year_id, ?, ?, ?, 'EXPECTED'
                 FROM plan_year py
                 JOIN plan p ON p.plan_id=py.plan_id
                 JOIN pension_case pc ON pc.case_id=p.case_id
-                WHERE pc.case_name=? AND p.plan_number=? AND py.year=?
+                WHERE pc.case_name=? AND py.year=?
+                  AND p.plan_id=(SELECT MIN(p2.plan_id) FROM plan p2 WHERE p2.case_id=pc.case_id)
                 ON CONFLICT(efast_filing_id) WHERE efast_filing_id IS NOT NULL DO UPDATE SET
-                  filing_date=excluded.filing_date, source_url=excluded.source_url`,
-          bind: [row.dateReceived, row.filingId, row.sourceUrl, caseName, row.planNumber, row.planYear],
+                  filing_date=excluded.filing_date,source_url=excluded.source_url`,
+          bind: [row.dateReceived, row.filingId, row.sourceUrl, caseName, row.planYear],
         },
       );
     }
@@ -275,7 +295,96 @@ export async function correctNumericValue(filingValueId: number, newValue: numbe
 }
 
 export async function listCases(): Promise<Array<Record<string, unknown>>> {
-  return db.exec('SELECT case_id,case_name,notes FROM pension_case ORDER BY case_name');
+  return db.exec(`
+    SELECT pc.case_id, pc.case_name, pc.notes,
+           p.plan_id, p.plan_number, p.sponsor_ein, p.sponsor_name
+    FROM pension_case pc
+    LEFT JOIN plan p ON p.plan_id=(
+      SELECT MIN(p2.plan_id) FROM plan p2 WHERE p2.case_id=pc.case_id
+    )
+    ORDER BY pc.case_name
+  `);
+}
+
+export async function ensureCasePlan(caseId: number): Promise<number> {
+  const existing = await db.exec<{ plan_id: number }>(
+    'SELECT plan_id FROM plan WHERE case_id=? ORDER BY plan_id LIMIT 1',
+    [caseId],
+  );
+  if (existing[0]) return existing[0].plan_id;
+
+  await db.transaction([
+    {
+      sql: `INSERT INTO plan(case_id,plan_name)
+            SELECT case_id,case_name FROM pension_case WHERE case_id=?`,
+      bind: [caseId],
+    },
+    {
+      sql: `INSERT INTO audit_log(entity_type,entity_id,action,old_value,new_value)
+            SELECT 'PLAN',plan_id,'CREATE_INTERNAL',NULL,
+                   json_object('case_id',case_id,'plan_name',plan_name,'reason','case-plan compatibility row')
+            FROM plan WHERE case_id=? ORDER BY plan_id LIMIT 1`,
+      bind: [caseId],
+    },
+  ]);
+
+  const created = await db.exec<{ plan_id: number }>(
+    'SELECT plan_id FROM plan WHERE case_id=? ORDER BY plan_id LIMIT 1',
+    [caseId],
+  );
+  if (!created[0]) throw new Error('Unable to initialize the case storage row.');
+  return created[0].plan_id;
+}
+
+export async function createCaseContext(
+  caseName: string,
+  planNumber: string | null = null,
+  notes: string | null = null,
+): Promise<void> {
+  await db.transaction([
+    { sql: 'INSERT INTO pension_case(case_name,notes) VALUES(?,?)', bind: [caseName, notes] },
+    {
+      sql: `INSERT INTO plan(case_id,plan_name,plan_number)
+            SELECT case_id,case_name,? FROM pension_case WHERE case_name=?`,
+      bind: [planNumber, caseName],
+    },
+    {
+      sql: `INSERT INTO audit_log(entity_type,entity_id,action,old_value,new_value)
+            SELECT 'PENSION_CASE',case_id,'CREATE',NULL,
+                   json_object('case_name',case_name,'plan_number',?,'notes',notes)
+            FROM pension_case WHERE case_name=?`,
+      bind: [planNumber, caseName],
+    },
+  ]);
+}
+
+export async function updateCaseContext(
+  caseId: number,
+  caseName: string,
+  planNumber: string | null,
+  notes: string | null,
+): Promise<void> {
+  const planId = await ensureCasePlan(caseId);
+  await db.transaction([
+    {
+      sql: `INSERT INTO audit_log(entity_type,entity_id,action,old_value,new_value)
+            SELECT 'PENSION_CASE',pc.case_id,'UPDATE',
+                   json_object('case_name',pc.case_name,'plan_number',p.plan_number,'notes',pc.notes),
+                   json_object('case_name',?,'plan_number',?,'notes',?)
+            FROM pension_case pc
+            LEFT JOIN plan p ON p.plan_id=?
+            WHERE pc.case_id=?`,
+      bind: [caseName, planNumber, notes, planId, caseId],
+    },
+    {
+      sql: 'UPDATE pension_case SET case_name=?,notes=?,updated_at=CURRENT_TIMESTAMP WHERE case_id=?',
+      bind: [caseName, notes, caseId],
+    },
+    {
+      sql: 'UPDATE plan SET plan_name=?,plan_number=?,updated_at=CURRENT_TIMESTAMP WHERE plan_id=?',
+      bind: [caseName, planNumber, planId],
+    },
+  ]);
 }
 
 export async function createCase(caseName: string, notes: string | null = null): Promise<void> {
