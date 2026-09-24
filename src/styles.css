@@ -574,3 +574,68 @@ button.button-tertiary:hover:not(:disabled) {
 @media (max-width: 520px) {
   .diagnostic-grid { grid-template-columns: 1fr; }
 }
+
+
+.workspace-gate {
+  max-width: 980px;
+  margin: 0 auto;
+  padding-top: clamp(2rem, 7vh, 5rem);
+}
+.workspace-file-card {
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(180deg, rgba(18, 26, 36, .98), rgba(10, 16, 23, .98));
+  box-shadow: var(--shadow);
+  padding: clamp(1.2rem, 3vw, 2rem);
+}
+.workspace-file-card h2 {
+  margin-bottom: .55rem;
+  font-size: clamp(1.6rem, 3vw, 2.15rem);
+}
+.workspace-file-lede {
+  max-width: 760px;
+  color: var(--muted-strong);
+  line-height: 1.6;
+}
+.workspace-file-facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: .8rem;
+  margin: 1.25rem 0;
+}
+.workspace-file-facts > div {
+  display: grid;
+  gap: .25rem;
+  padding: .9rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: rgba(8, 13, 19, .62);
+}
+.workspace-file-facts strong { color: var(--text); }
+.workspace-file-facts span {
+  color: var(--muted);
+  font-size: .8rem;
+  line-height: 1.4;
+}
+.workspace-file-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .65rem;
+  margin: 1rem 0 .65rem;
+}
+.workspace-file-warning {
+  margin: 1rem 0;
+  padding: .85rem 1rem;
+  border: 1px solid #6b4e2a;
+  border-radius: var(--radius-sm);
+  background: rgba(117, 78, 28, .18);
+  color: #f0d2a7;
+  line-height: 1.5;
+}
+.sidebar-footnote .sidebar-footnote-label:not(:first-child) {
+  margin-top: .7rem;
+}
+
+@media (max-width: 760px) {
+  .workspace-file-facts { grid-template-columns: 1fr; }
+}
