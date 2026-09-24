@@ -18,9 +18,9 @@ interface TestStep {
 const TEST_STEPS: TestStep[] = [
   {
     title: 'Create the filing context',
-    action: 'Create or select one Case, Plan, Plan Year, and Filing.',
+    action: 'Create or select one Case, Plan Year, and Filing. In Ragtime, one case is one pension plan.',
     expected: 'You finish with a single filing context selected.',
-    proves: 'Ragtime can maintain the authoritative case → plan → year → filing hierarchy.',
+    proves: 'Ragtime can maintain the authoritative case → plan year → filing hierarchy without asking you to create a duplicate Plan record.',
     section: 'workspace',
     button: 'Go to case setup',
   },
@@ -158,7 +158,7 @@ export function HomeGuide({ workspaceName, onNavigate }: Props) {
 
         <button className="home-action" type="button" onClick={() => onNavigate('workspace')}>
           <strong>Set up or change a case</strong>
-          <span>Case → Plan → Year → Filing, one decision at a time.</span>
+          <span>Case → Plan Year → Filing, one decision at a time.</span>
         </button>
 
         <button className="home-action" type="button" onClick={() => onNavigate('explore')}>
