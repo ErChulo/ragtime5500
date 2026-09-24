@@ -23,7 +23,7 @@ type WorkerResponse =
 
 function workerFromBundledUrl(url: string): Worker {
   if (!url.startsWith('data:')) {
-    return new Worker(url, { type: 'module', name: 'ragtime5500-db' });
+    return new Worker(url, { name: 'ragtime5500-db' });
   }
 
   const separator = url.indexOf(',');
@@ -37,11 +37,11 @@ function workerFromBundledUrl(url: string): Worker {
     bytes[index] = binary.charCodeAt(index);
   }
 
-  // A top-level data: worker is rejected by Chromium when the application is
-  // opened from file:// because file URLs have opaque origins. Rehydrate the
-  // bundled worker into a blob: URL so it inherits the document's origin.
+  // Chrome rejects top-level module workers launched from a file:// document
+  // because file URLs have opaque origins. The production worker is emitted as
+  // a self-contained classic IIFE, then rehydrated into a blob: URL here.
   const blobUrl = URL.createObjectURL(new Blob([bytes], { type: 'text/javascript' }));
-  const worker = new Worker(blobUrl, { type: 'module', name: 'ragtime5500-db' });
+  const worker = new Worker(blobUrl, { name: 'ragtime5500-db' });
   worker.addEventListener('error', () => URL.revokeObjectURL(blobUrl), { once: true });
   return worker;
 }
