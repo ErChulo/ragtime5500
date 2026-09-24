@@ -232,7 +232,9 @@ export default defineConfig({
   base: './',
   plugins: [react(), inlineSqliteWasm(), singleHtmlBundle()],
   worker: {
-    format: 'es',
+    // Classic IIFE avoids Chrome's cross-origin module-worker restriction when
+    // the standalone application is opened directly from file://.
+    format: 'iife',
     plugins: () => [inlineSqliteWasm()],
     rollupOptions: {
       output: {
