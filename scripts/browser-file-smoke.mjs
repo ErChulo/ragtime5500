@@ -200,7 +200,7 @@ try {
 
   await waitFor(
     browser.cdp,
-    `document.body?.innerText.includes('SQLite ready') && document.body?.innerText.includes('Open existing workspace') && document.body?.innerText.includes('Create new workspace')`,
+    `document.body?.innerText.includes('SQLite is ready') && document.body?.innerText.includes('Open existing workspace') && document.body?.innerText.includes('Create new workspace')`,
     'direct-file SQLite startup and workspace chooser',
   );
 
