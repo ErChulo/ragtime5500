@@ -9,41 +9,36 @@ interface Props {
 export function WorkspaceFileGate({ databaseReady, supported, status, onOpen, onCreate }: Props) {
   return (
     <main className="workspace workspace-gate" id="main-content">
-      <section className="workspace-file-card" aria-labelledby="workspace-file-title">
-        <p className="eyebrow">Local persistent workspace</p>
-        <h2 id="workspace-file-title">Open a Ragtime database</h2>
+      <section className="workspace-file-card simple-gate" aria-labelledby="workspace-file-title">
+        <p className="eyebrow">First step</p>
+        <h2 id="workspace-file-title">Choose where Ragtime saves your work</h2>
         <p className="workspace-file-lede">
-          Ragtime runs directly from this HTML file. Your case data, imported PDFs, eFAST CSV rows,
-          extracted values, and audit history are stored in a separate local SQLite workspace file
-          that you choose.
+          Ragtime uses one local SQLite workspace file. Nothing is sent anywhere.
         </p>
-
-        <div className="workspace-file-facts" aria-label="Workspace properties">
-          <div><strong>No server</strong><span>Direct file:// application</span></div>
-          <div><strong>No network</strong><span>Outbound connections remain blocked</span></div>
-          <div><strong>Portable</strong><span>One SQLite workspace contains the case database and source-file bytes</span></div>
-        </div>
 
         {!supported && databaseReady ? (
           <div className="workspace-file-warning" role="alert">
-            This Chrome installation does not expose the local file access API needed to write a persistent
-            workspace from a directly opened HTML file.
+            This Chrome installation does not expose the local file access API Ragtime needs.
           </div>
         ) : null}
 
-        <div className="workspace-file-actions">
+        <div className="workspace-choice-grid">
           <button type="button" onClick={onOpen} disabled={!databaseReady || !supported}>
-            Open existing workspace
+            <strong>Open my existing workspace</strong>
+            <span>I already created a Ragtime .sqlite3 file.</span>
           </button>
           <button className="button-secondary" type="button" onClick={onCreate} disabled={!databaseReady || !supported}>
-            Create new workspace
+            <strong>Create a new workspace</strong>
+            <span>This is my first time using this case database.</span>
           </button>
         </div>
 
-        <p className="action-hint">
-          After reopening Ragtime later, choose the same <span className="mono">.sqlite3</span> workspace file.
-          No data is stored on a server.
-        </p>
+        <details className="why-workspace">
+          <summary>What is a workspace?</summary>
+          <p>
+            It is the local SQLite file that holds the case database and imported evidence. Keep it with the case files and reopen the same file next time.
+          </p>
+        </details>
 
         {status ? <p className="status" role="status">{status}</p> : null}
       </section>
