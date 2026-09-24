@@ -8,6 +8,7 @@ import { ImportWizard } from '../components/ImportWizard';
 import { ReviewWizard } from '../components/ReviewWizard';
 import { ExploreWizard } from '../components/ExploreWizard';
 import { DatabaseWorkspace } from '../components/DatabaseWorkspace';
+import { HomeGuide } from '../components/HomeGuide';
 
 export default function App() {
   const [dbInfo, setDbInfo] = useState('Initializing SQLite…');
@@ -99,14 +100,17 @@ export default function App() {
         </aside>
 
         <main className="workspace" id="main-content">
-          <section className="workspace-heading" aria-labelledby="workspace-title">
-            <div>
-              <p className="eyebrow">{section.step} / 05</p>
-              <h2 id="workspace-title">{section.label}</h2>
-              <p>{section.description}</p>
-            </div>
-          </section>
+          {activeSection !== 'home' ? (
+            <section className="workspace-heading" aria-labelledby="workspace-title">
+              <div>
+                <p className="eyebrow">Current task</p>
+                <h2 id="workspace-title">{section.label}</h2>
+                <p>{section.description}</p>
+              </div>
+            </section>
+          ) : null}
 
+          {activeSection === 'home' ? <HomeGuide workspaceName={workspaceName} onNavigate={navigate} /> : null}
           {activeSection === 'workspace' ? <HierarchyPanel refreshToken={refreshToken} onContinue={() => navigate('import')} /> : null}
           {activeSection === 'import' ? <ImportWizard refreshToken={refreshToken} onChanged={refresh} /> : null}
           {activeSection === 'review' ? <ReviewWizard refreshToken={refreshToken} onChanged={refresh} /> : null}
