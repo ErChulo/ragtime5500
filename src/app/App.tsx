@@ -51,7 +51,7 @@ export default function App() {
       <div className="security-strip">
         <strong>Air-gapped runtime</strong>
         <span>Local files only</span>
-        <span>SQLite + OPFS</span>
+        <span>SQLite + IndexedDB</span>
         <span>eFAST URLs are provenance text only</span>
       </div>
 
