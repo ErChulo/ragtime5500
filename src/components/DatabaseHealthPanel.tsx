@@ -18,7 +18,7 @@ export function DatabaseHealthPanel() {
   const run = async () => {
     setWorking(true);
     setFailures([]);
-    setStatus('Checking SQLite, reopening the IndexedDB-backed database, and verifying stored source hashes…');
+    setStatus('Checking the SQLite workspace and verifying embedded source-document hashes…');
 
     try {
       const before = await db.diagnostics();
@@ -59,7 +59,7 @@ export function DatabaseHealthPanel() {
       setStatus(
         nextFailures.length
           ? `SQLite passed, but ${nextFailures.length} of ${documents.length} stored source document${documents.length === 1 ? '' : 's'} failed verification.`
-          : `PASS — SQLite reopened from IndexedDB and ${checked} stored source document${checked === 1 ? '' : 's'} passed size and SHA-256 verification.`,
+          : `PASS — SQLite workspace reopened and ${checked} stored source document${checked === 1 ? '' : 's'} passed size and SHA-256 verification.`,
       );
     } catch (error) {
       setStatus(`Integrity check failed: ${error instanceof Error ? error.message : String(error)}`);
@@ -75,7 +75,7 @@ export function DatabaseHealthPanel() {
           <p className="eyebrow">Local integrity</p>
           <h2>Database and source health</h2>
           <p className="panel-description">
-            Reopens SQLite from its IndexedDB snapshot, runs SQLite integrity/foreign-key checks, then verifies every imported source file against its recorded size and SHA-256.
+            Runs SQLite integrity/foreign-key checks, then verifies every imported source file stored inside the workspace against its recorded size and SHA-256.
           </p>
         </div>
       </div>
