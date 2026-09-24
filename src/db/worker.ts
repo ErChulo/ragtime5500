@@ -192,7 +192,7 @@ async function handle(request: Request): Promise<unknown> {
       await openDatabase(request.bytes);
       return {
         sqliteVersion: sqlite3.version.libVersion,
-        persistence: 'IndexedDB snapshot',
+        persistence: 'user-selected SQLite workspace file',
         filename: DB_NAME,
         foreignKeys: db.selectValue('PRAGMA foreign_keys'),
       };
