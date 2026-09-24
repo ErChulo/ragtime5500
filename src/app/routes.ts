@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { AppSection } from '../components/AppNavigation';
 
-const DEFAULT_SECTION: AppSection = 'workspace';
-const VALID_SECTIONS = new Set<AppSection>(['workspace', 'import', 'review', 'explore', 'database']);
+const DEFAULT_SECTION: AppSection = 'home';
+const VALID_SECTIONS = new Set<AppSection>(['home', 'workspace', 'import', 'review', 'explore', 'database']);
 
 export function sectionFromHash(hash: string): AppSection {
   const candidate = hash.replace(/^#\/?/, '').split(/[/?]/, 1)[0] as AppSection;
