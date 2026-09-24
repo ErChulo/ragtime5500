@@ -1,20 +1,13 @@
 import { useEffect, useState } from 'react';
 import { db } from '../db/client';
-import { CsvImportPanel } from '../components/CsvImportPanel';
-import { PdfImportPanel } from '../components/PdfImportPanel';
-import { QueryPanel } from '../components/QueryPanel';
-import { SqlConsole } from '../components/SqlConsole';
 import { HierarchyPanel } from '../components/HierarchyPanel';
-import { MatchReview } from '../components/MatchReview';
-import { ExtractionReview } from '../components/ExtractionReview';
 import { AppNavigation, appSections } from '../components/AppNavigation';
-import { BackupRestorePanel } from '../components/BackupRestorePanel';
-import { DatabaseHealthPanel } from '../components/DatabaseHealthPanel';
-import { AuditHistoryPanel } from '../components/AuditHistoryPanel';
-import { DocumentSearchPanel } from '../components/DocumentSearchPanel';
-import { ConceptHistoryPanel } from '../components/ConceptHistoryPanel';
 import { useHashSection } from './routes';
 import { WorkspaceFileGate } from '../components/WorkspaceFileGate';
+import { ImportWizard } from '../components/ImportWizard';
+import { ReviewWizard } from '../components/ReviewWizard';
+import { ExploreWizard } from '../components/ExploreWizard';
+import { DatabaseWorkspace } from '../components/DatabaseWorkspace';
 
 export default function App() {
   const [dbInfo, setDbInfo] = useState('Initializing SQLite…');
@@ -80,18 +73,10 @@ export default function App() {
           <p className="brand-subtitle">Structured pension filing data with page-level provenance.</p>
         </div>
         <div className="system-status" aria-label="Local security and database status">
-          <span className="status-pill status-pill-secure"><span className="status-dot" />Network blocked</span>
-          <span className={`status-pill${dbReady ? ' status-pill-ready' : ''}`}>{dbReady ? 'SQLite ready' : 'SQLite starting'}</span>
-          <span className={`status-pill${workspaceName ? ' status-pill-ready' : ''}`}>{workspaceName ? `Workspace: ${workspaceName}` : 'No workspace open'}</span>
+          <span className="status-pill status-pill-secure"><span className="status-dot" />Offline</span>
+          <span className={`status-pill${workspaceName ? ' status-pill-ready' : ''}`}>{workspaceName ? workspaceName : dbReady ? 'Choose workspace' : 'Starting'}</span>
         </div>
       </header>
-
-      <div className="security-strip">
-        <strong>Air-gapped runtime</strong>
-        <span>Local files only</span>
-        <span>SQLite workspace file</span>
-        <span>eFAST URLs are provenance text only</span>
-      </div>
 
       {!workspaceName ? (
         <WorkspaceFileGate
@@ -122,36 +107,11 @@ export default function App() {
             </div>
           </section>
 
-          {activeSection === 'workspace' ? <HierarchyPanel refreshToken={refreshToken} /> : null}
-          {activeSection === 'import' ? (
-            <div className="two-column">
-              <CsvImportPanel onImported={refresh} />
-              <PdfImportPanel onImported={refresh} />
-            </div>
-          ) : null}
-          {activeSection === 'review' ? (
-            <>
-              <MatchReview refreshToken={refreshToken} onChanged={refresh} />
-              <ExtractionReview refreshToken={refreshToken} onChanged={refresh} />
-            </>
-          ) : null}
-          {activeSection === 'explore' ? (
-            <>
-              <QueryPanel />
-              <ConceptHistoryPanel />
-              <DocumentSearchPanel />
-            </>
-          ) : null}
-          {activeSection === 'database' ? (
-            <>
-              <div className="two-column">
-                <BackupRestorePanel onRestored={refresh} />
-                <DatabaseHealthPanel />
-              </div>
-              <AuditHistoryPanel refreshToken={refreshToken} />
-              <SqlConsole />
-            </>
-          ) : null}
+          {activeSection === 'workspace' ? <HierarchyPanel refreshToken={refreshToken} onContinue={() => navigate('import')} /> : null}
+          {activeSection === 'import' ? <ImportWizard refreshToken={refreshToken} onChanged={refresh} /> : null}
+          {activeSection === 'review' ? <ReviewWizard refreshToken={refreshToken} onChanged={refresh} /> : null}
+          {activeSection === 'explore' ? <ExploreWizard /> : null}
+          {activeSection === 'database' ? <DatabaseWorkspace refreshToken={refreshToken} onRestored={refresh} /> : null}
         </main>
       </div>
       )}
