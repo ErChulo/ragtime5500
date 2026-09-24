@@ -461,6 +461,36 @@ async function firstRun() {
       : 'no exception location available';
     const privateField = exception?.match(/Private field '#([^']+)'/)?.[1];
     const fieldDiagnostics = privateField ? await privateFieldDiagnostics(privateField) : 'no private-field diagnostic requested';
+    const capabilityDiagnostics = await evaluate(session.cdp, `new Promise(async (resolve) => {
+      const result = { origin: location.origin, secure: isSecureContext, indexedDB: null, localStorage: null, opfs: null };
+      try {
+        localStorage.setItem('__ragtime_probe__', 'ok');
+        result.localStorage = localStorage.getItem('__ragtime_probe__');
+        localStorage.removeItem('__ragtime_probe__');
+      } catch (error) {
+        result.localStorage = String(error?.message ?? error);
+      }
+      try {
+        result.indexedDB = await new Promise((done) => {
+          const request = indexedDB.open('__ragtime_probe__', 1);
+          request.onsuccess = () => {
+            request.result.close();
+            indexedDB.deleteDatabase('__ragtime_probe__');
+            done('ok');
+          };
+          request.onerror = () => done(String(request.error?.message ?? request.error));
+        });
+      } catch (error) {
+        result.indexedDB = String(error?.message ?? error);
+      }
+      try {
+        await navigator.storage.getDirectory();
+        result.opfs = 'ok';
+      } catch (error) {
+        result.opfs = String(error?.message ?? error);
+      }
+      resolve(result);
+    })`, true).catch((error) => ({ error: String(error) }));
     throw new Error(`${error instanceof Error ? error.message : String(error)}\nBrowser snapshot:\n${snapshot}\nBrowser messages:\n${browserMessages.join('\n')}\nCompiled source snippet:\n${snippet}\nPrivate-field diagnostics:\n${fieldDiagnostics}\nChrome stderr:\n${session.stderr()}`);
   } finally {
     await closeChrome(session);
