@@ -1,4 +1,4 @@
-import { deleteFileBytes, readFileBytes, writeFileBytes } from '../storage/indexedDb';
+import { db } from '../db/client';
 import { sha256Hex } from '../utils/hash';
 
 export interface StoredFile {
@@ -30,10 +30,16 @@ export async function storeLocalFile(file: File, category: 'csv' | 'pdf' | 'back
   const bytes = new Uint8Array(buffer);
   const sha256 = await sha256Hex(bytes);
   const extension = extensionOf(file.name);
-  const storedName = `${sha256}${extension}`;
-  const storageKey = `${ROOT}/${category}/${storedName}`;
+  const storageKey = `${ROOT}/${category}/${sha256}${extension}`;
 
-  await writeFileBytes(storageKey, bytes);
+  await db.exec(
+    `INSERT INTO local_file_blob(storage_key, bytes)
+     VALUES(?,?)
+     ON CONFLICT(storage_key) DO UPDATE SET
+       bytes=excluded.bytes,
+       updated_at=CURRENT_TIMESTAMP`,
+    [storageKey, bytes],
+  );
 
   return {
     sha256,
@@ -47,14 +53,25 @@ export async function storeLocalFile(file: File, category: 'csv' | 'pdf' | 'back
 
 export async function writeStoredFile(storageKey: string, bytes: Uint8Array): Promise<void> {
   assertStorageKey(storageKey);
-  await writeFileBytes(storageKey, bytes);
+  await db.exec(
+    `INSERT INTO local_file_blob(storage_key, bytes)
+     VALUES(?,?)
+     ON CONFLICT(storage_key) DO UPDATE SET
+       bytes=excluded.bytes,
+       updated_at=CURRENT_TIMESTAMP`,
+    [storageKey, bytes],
+  );
 }
 
 export async function readStoredFile(storageKey: string): Promise<Uint8Array> {
   assertStorageKey(storageKey);
-  const bytes = await readFileBytes(storageKey);
-  if (!bytes) throw new Error('Stored local file is missing from IndexedDB.');
-  return new Uint8Array(bytes);
+  const rows = await db.exec<{ bytes: Uint8Array }>(
+    'SELECT bytes FROM local_file_blob WHERE storage_key=?',
+    [storageKey],
+  );
+  const value = rows[0]?.bytes;
+  if (!value) throw new Error('Stored local source file is missing from the Ragtime workspace database.');
+  return value instanceof Uint8Array ? value : new Uint8Array(value);
 }
 
 export async function deleteStoredFile(storageKey: string): Promise<void> {
@@ -63,5 +80,5 @@ export async function deleteStoredFile(storageKey: string): Promise<void> {
   } catch {
     return;
   }
-  await deleteFileBytes(storageKey);
+  await db.exec('DELETE FROM local_file_blob WHERE storage_key=?', [storageKey]);
 }
