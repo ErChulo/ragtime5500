@@ -1,10 +1,35 @@
 # Ragtime 5500
 
+[![Ragtime 5500 CI](https://github.com/ErChulo/ragtime5500/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ErChulo/ragtime5500/actions/workflows/ci.yml)
+![Single HTML](https://img.shields.io/badge/build-single%20HTML-passing-brightgreen)
+![Direct file runtime](https://img.shields.io/badge/runtime-file%3A%2F%2F-passing-brightgreen)
+![Zero outbound network](https://img.shields.io/badge/outbound%20network-blocked-passing-brightgreen)
+![SQLite WASM](https://img.shields.io/badge/SQLite-WASM-passing-brightgreen)
+![Schema contracts](https://img.shields.io/badge/schema%20contracts-passing-brightgreen)
+![Security audit](https://img.shields.io/badge/security%20audit-passing-brightgreen)
+![Manual acceptance](https://img.shields.io/badge/manual%20acceptance-in%20progress-yellow)
+
 **Offline Form 5500 Case Database + Local Retrieval**
 
 Ragtime 5500 is a local-first Vite + React + TypeScript application for importing, storing, tracing, querying, reviewing, and eventually analyzing Form 5500 filings across pension cases and plan years.
 
 The structured SQLite database is authoritative. Full-text retrieval and future local RAG capabilities are secondary layers and may not invent database facts.
+
+## UX operating principle
+
+Ragtime is designed for low working-memory load. A first-time user should not have to remember the application structure.
+
+The interface therefore follows these rules:
+
+- show one primary decision at a time;
+- keep optional and destructive controls collapsed until requested;
+- always provide a visible **Guide** return point;
+- explain **what to do now**, **what should happen**, and **what the step proves**;
+- use the application itself as a cheat sheet instead of requiring memorized procedures;
+- reserve advanced SQL, diagnostics, and maintenance tools for explicit disclosure;
+- treat supervisor-ready deliverables as a first-class product requirement after the Milestone 1 vertical slice is accepted.
+
+For the complete manual walkthrough, see **[docs/testing-guide.md](docs/testing-guide.md)**.
 
 ## Final-deliverable contract
 
@@ -68,6 +93,15 @@ After a successful check, the only production runtime artifact is:
 ```text
 dist/ragtime5500.html
 ```
+
+## Testing
+
+The repository has two layers of acceptance:
+
+1. **Automated gates** — TypeScript/tests, SQLite schema contracts, single-file build, zero-network source audit, direct-`file://` browser startup, embedded runtime resources, and workspace-file capability checks.
+2. **Target-workstation acceptance** — the real eFAST CSV/PDF workflow, source-page verification, persistence after restart, backup/restore, and DevTools confirmation of zero outbound requests.
+
+Use the step-by-step **[Manual Test Drive](docs/testing-guide.md)**. It is written as one action per step so a tester does not need to hold the workflow in short-term memory.
 
 ## Milestone 1 scope
 
