@@ -59,7 +59,7 @@ export async function importEfastRows(caseName: string, stored: StoredFile, rows
     statements.push({
       sql: `INSERT INTO efast_import_row(
               efast_import_id,row_number,plan_number,plan_name,plan_year,date_received,plan_codes,
-              participants,participants_eoy,assets_boy,assets_eoy,source_url,raw_row_json,raw_record_text,
+              participants,participants_eoy,assets_boy,assets_eoy,source_url,raw_row_json,raw_record_text,efast_filing_id,
               matched_filing_id,classification_status,classification_reason,included_for_matching,user_verified
             )
             SELECT ei.efast_import_id,?,?,?,?,?,?,?,?,?,?,?,?,?,NULL,
@@ -68,7 +68,7 @@ export async function importEfastRows(caseName: string, stored: StoredFile, rows
       bind: [
         row.rowNumber, row.planNumber, row.planName, row.planYear, row.dateReceived, row.planCodes,
         row.participants, row.participantsEoy, row.assetsBoy, row.assetsEoy, row.sourceUrl,
-        JSON.stringify(row.raw), row.rawRecordText, sourceDocumentId,
+        JSON.stringify(row.raw), row.rawRecordText, row.filingId, sourceDocumentId,
       ],
     });
   }
@@ -84,7 +84,7 @@ export async function importEfastRows(caseName: string, stored: StoredFile, rows
 export async function listEfastRowsForReview(efastImportId: number): Promise<Array<Record<string, unknown>>> {
   return db.exec(`
     SELECT import_row_id,row_number,plan_number,plan_name,plan_year,date_received,plan_codes,
-           participants,participants_eoy,assets_boy,assets_eoy,source_url,
+           participants,participants_eoy,assets_boy,assets_eoy,source_url,efast_filing_id,
            classification_status,classification_reason,included_for_matching,user_verified
     FROM efast_import_row
     WHERE efast_import_id=?
