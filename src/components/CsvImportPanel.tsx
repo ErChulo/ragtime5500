@@ -5,7 +5,7 @@ import { importEfastRows, listCases } from '../db/repository';
 
 interface Row { [key: string]: unknown }
 
-export function CsvImportPanel({ onImported }: { onImported: () => void }) {
+export function CsvImportPanel({ onImported }: { onImported: (efastImportId: number) => void }) {
   const [cases, setCases] = useState<Row[]>([]);
   const [caseId, setCaseId] = useState<number | null>(null);
   const [file, setFile] = useState<File | null>(null);
@@ -49,7 +49,7 @@ export function CsvImportPanel({ onImported }: { onImported: () => void }) {
       const rows = parseEfastCsv(text);
       const importId = await importEfastRows(String(selectedCase.case_name), stored, rows);
       setStatus(`Imported ${rows.length} raw rows. eFAST import ID ${importId}.`);
-      onImported();
+      onImported(importId);
     } catch (error) {
       setStatus(`Import failed: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
@@ -64,7 +64,7 @@ export function CsvImportPanel({ onImported }: { onImported: () => void }) {
           <p className="eyebrow">Step 2</p>
           <h2>Import the eFAST CSV</h2>
           <p className="panel-description">
-            Ragtime will create the plan years and expected filing records for this case from the CSV.
+            Ragtime first preserves every CSV row exactly. You will then review the rows before any expected Form 5500 filing is created.
           </p>
         </div>
       </div>
@@ -98,7 +98,7 @@ export function CsvImportPanel({ onImported }: { onImported: () => void }) {
 
       <div className="panel-actions">
         <button type="button" onClick={() => void importFile()} disabled={!file || !selectedCase || working}>
-          {working ? 'Importing…' : 'Import CSV → continue to PDFs'}
+          {working ? 'Importing…' : 'Import CSV → review rows'}
         </button>
       </div>
 
