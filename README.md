@@ -16,7 +16,7 @@ JavaScript, CSS, SQLite WASM, the SQLite worker, the PDF.js worker, and other ru
 
 Application navigation uses hash routes such as `#/workspace`, `#/import`, `#/review`, `#/explore`, and `#/database`. Routing therefore does not depend on server rewrites or network requests.
 
-The final browser acceptance pass must prove that the standalone file initializes, persists its OPFS database, imports local files, and remains fully functional with networking disabled in the target office browser.
+The final browser acceptance pass must prove that the standalone file initializes, persists its IndexedDB-backed SQLite database, imports local files, and remains fully functional with networking disabled in the target office browser.
 
 ## Security invariant
 
@@ -38,7 +38,7 @@ See `docs/security.md` and `docs/milestone-1-test-plan.md`.
 
 This repository contains **application source code only**. Do not commit pension case material.
 
-The `.gitignore` blocks common case-data artifacts including PDFs, imported CSVs, SQLite databases, backups, OPFS/browser data, and local model files. Test fixtures use synthetic names and values. Real acceptance values and source-page evidence belong only in the local application database.
+The `.gitignore` blocks common case-data artifacts including PDFs, imported CSVs, SQLite databases, backups, IndexedDB/browser data, and local model files. Test fixtures use synthetic names and values. Real acceptance values and source-page evidence belong only in the local application database.
 
 ## Development
 
