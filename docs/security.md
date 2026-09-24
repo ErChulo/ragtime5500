@@ -11,7 +11,7 @@
 9. Internal navigation uses URL fragments only. Hash routing does not trigger a document or network navigation.
 10. The optional acceptance server binds to `127.0.0.1` only and serves the same single HTML artifact.
 11. No analytics, telemetry, remote fonts, remote scripts, CDN references, or cloud model calls are allowed.
-12. All imported source files are copied into OPFS and addressed by SHA-256-derived storage keys.
+12. All imported source files are copied into IndexedDB and addressed by SHA-256-derived storage keys.
 13. Local model support, when added later, must use bundled hash-pinned model/tokenizer assets.
 14. Pension case artifacts are excluded from the public source repository through `.gitignore` and repository policy.
 15. Release requires both the source network audit and the single-file artifact audit.
@@ -19,4 +19,4 @@
 
 ## Standalone-file caveat to verify
 
-The target office browser must be tested with the final `ragtime5500.html` opened in the intended manner. The release is not considered complete until OPFS, embedded workers, SQLite WASM, PDF.js, backup/restore, and hash routing all work in that exact environment.
+The target office browser must be tested with the final `ragtime5500.html` opened in the intended manner. The release is not considered complete until IndexedDB persistence, embedded workers, SQLite WASM, PDF.js, backup/restore, and hash routing all work in that exact environment.
