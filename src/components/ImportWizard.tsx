@@ -13,15 +13,27 @@ export function ImportWizard({ refreshToken, onChanged }: { refreshToken: number
 
   useEffect(() => {
     let active = true;
+    let activeCaseId: number | null = null;
+    try {
+      const raw = sessionStorage.getItem('ragtime-active-case-id');
+      activeCaseId = raw ? Number(raw) : null;
+    } catch {
+      activeCaseId = null;
+    }
+
+    const whereCase = activeCaseId !== null && Number.isFinite(activeCaseId) ? 'WHERE ei.case_id=?' : '';
+    const bind = whereCase ? [activeCaseId] : [];
+
     void db.exec<{ efast_import_id: number; pending_count: number }>(`
       SELECT ei.efast_import_id,
              (SELECT COUNT(*) FROM efast_import_row er
               WHERE er.efast_import_id=ei.efast_import_id
                 AND er.classification_status='NEEDS_REVIEW') AS pending_count
       FROM efast_import ei
+      ${whereCase}
       ORDER BY ei.efast_import_id DESC
       LIMIT 1
-    `).then((rows) => {
+    `, bind).then((rows) => {
       if (!active || !rows[0]) return;
       setEfastImportId(Number(rows[0].efast_import_id));
       const done = Number(rows[0].pending_count) === 0;
@@ -67,7 +79,7 @@ export function ImportWizard({ refreshToken, onChanged }: { refreshToken: number
         <button
           type="button"
           className={step === 'pdf' ? 'substep active' : 'substep'}
-          disabled={!reviewComplete}
+          disabled={!reviewComplete || efastImportId === null}
           onClick={() => setStep('pdf')}
         >
           <span>3</span> Local PDFs
@@ -78,7 +90,7 @@ export function ImportWizard({ refreshToken, onChanged }: { refreshToken: number
       {step === 'review' && efastImportId !== null ? (
         <EfastRowReviewPanel efastImportId={efastImportId} onComplete={reviewFinished} />
       ) : null}
-      {step === 'pdf' ? <PdfImportPanel onImported={onChanged} /> : null}
+      {step === 'pdf' && efastImportId !== null ? <PdfImportPanel efastImportId={efastImportId} onImported={onChanged} /> : null}
     </section>
   );
 }

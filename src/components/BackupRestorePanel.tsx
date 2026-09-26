@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { createWorkspaceArchive, restoreWorkspaceArchive } from '../backup/workspaceArchive';
 import { db } from '../db/client';
+import { versionedArtifactName } from '../app/version';
+import { ProcessStatus } from './ProcessStatus';
 
 function downloadBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
@@ -30,7 +32,7 @@ export function BackupRestorePanel({ onRestored }: { onRestored: () => void }) {
     setWorking(true);
     try {
       const bytes = await db.exportDatabase();
-      downloadBytes(bytes, `ragtime5500-backup-${new Date().toISOString().slice(0, 10)}.sqlite3`, 'application/x-sqlite3');
+      downloadBytes(bytes, versionedArtifactName('ragtime5500-backup', 'sqlite3'), 'application/x-sqlite3');
       setStatus(`Database backup created locally (${bytes.byteLength.toLocaleString()} bytes). SQLite integrity checks passed before export.`);
     } catch (error) {
       setStatus(`Backup failed: ${error instanceof Error ? error.message : String(error)}`);
@@ -44,7 +46,7 @@ export function BackupRestorePanel({ onRestored }: { onRestored: () => void }) {
     setStatus('Verifying the SQLite database and all stored source documents before creating the workspace archive…');
     try {
       const { blob, result } = await createWorkspaceArchive();
-      downloadBlob(blob, `ragtime5500-workspace-${new Date().toISOString().slice(0, 10)}.r5500`);
+      downloadBlob(blob, versionedArtifactName('ragtime5500-workspace', 'r5500'));
       setStatus(
         `Full workspace backup created locally: ${result.documentCount} source document${result.documentCount === 1 ? '' : 's'}, ${result.archiveBytes.toLocaleString()} bytes total.`,
       );
@@ -142,6 +144,13 @@ export function BackupRestorePanel({ onRestored }: { onRestored: () => void }) {
           <button type="button" className="button-secondary" onClick={restoreDb} disabled={!restoreFile || working}>Restore SQLite</button>
         </div>
       </div>
+
+      <ProcessStatus
+        active={working}
+        label="Processing backup or restore locally"
+        detail={status || 'Verifying local files and SQLite state.'}
+        eta="duration depends on workspace size"
+      />
 
       <p className="backup-note">
         Full workspace archives verify SHA-256 for the SQLite payload and every source document before restoration. All processing and downloads remain local to the browser.

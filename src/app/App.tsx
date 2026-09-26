@@ -9,6 +9,7 @@ import { ReviewWizard } from '../components/ReviewWizard';
 import { ExploreWizard } from '../components/ExploreWizard';
 import { DatabaseWorkspace } from '../components/DatabaseWorkspace';
 import { HomeGuide } from '../components/HomeGuide';
+import { APP_CHANNEL, APP_VERSION } from './version';
 
 export default function App() {
   const [dbInfo, setDbInfo] = useState('Initializing SQLite…');
@@ -16,6 +17,7 @@ export default function App() {
   const [workspaceName, setWorkspaceName] = useState<string | null>(null);
   const [workspaceStatus, setWorkspaceStatus] = useState('');
   const [refreshToken, setRefreshToken] = useState(0);
+  const [workspaceBusy, setWorkspaceBusy] = useState(false);
   const [activeSection, navigate] = useHashSection();
   const refresh = () => setRefreshToken((value) => value + 1);
 
@@ -32,6 +34,7 @@ export default function App() {
 
 
   const openWorkspace = async () => {
+    setWorkspaceBusy(true);
     setWorkspaceStatus('Opening local SQLite workspace…');
     try {
       const name = await db.openWorkspace();
@@ -44,10 +47,13 @@ export default function App() {
       } else {
         setWorkspaceStatus(error instanceof Error ? error.message : String(error));
       }
+    } finally {
+      setWorkspaceBusy(false);
     }
   };
 
   const createWorkspace = async () => {
+    setWorkspaceBusy(true);
     setWorkspaceStatus('Creating local SQLite workspace…');
     try {
       const name = await db.createWorkspace();
@@ -60,6 +66,8 @@ export default function App() {
       } else {
         setWorkspaceStatus(error instanceof Error ? error.message : String(error));
       }
+    } finally {
+      setWorkspaceBusy(false);
     }
   };
 
@@ -70,8 +78,12 @@ export default function App() {
       <header className="app-header">
         <div className="brand-block">
           <p className="eyebrow">Offline Form 5500 workbench</p>
-          <h1>Ragtime 5500</h1>
+          <div className="brand-title-row">
+            <h1>Ragtime 5500</h1>
+            <span className="version-badge">v{APP_VERSION}</span>
+          </div>
           <p className="brand-subtitle">Structured pension filing data with page-level provenance.</p>
+          <p className="version-channel">{APP_CHANNEL}</p>
         </div>
         <div className="system-status" aria-label="Local security and database status">
           <span className="status-pill status-pill-secure"><span className="status-dot" />Offline</span>
@@ -86,6 +98,7 @@ export default function App() {
           status={workspaceStatus}
           onOpen={() => void openWorkspace()}
           onCreate={() => void createWorkspace()}
+          busy={workspaceBusy}
         />
       ) : (
       <div className="app-layout">
