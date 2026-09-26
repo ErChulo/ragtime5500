@@ -10,6 +10,7 @@ import { readStoredFile } from '../ingest/opfsFiles';
 import { extractScheduleH1c9 } from '../pdf/scheduleH1c9';
 import { extractPdfPages } from '../pdf/extractText';
 import { provenanceUrlText } from '../security/externalUrl';
+import { ProcessStatus } from './ProcessStatus';
 
 interface Props {
   refreshToken: number;
@@ -174,6 +175,7 @@ export function MatchReview({ refreshToken, onChanged }: Props) {
         </div>
       ) : null}
 
+      <ProcessStatus active={working} label="Saving reviewed PDF assignment" detail="Updating SQLite and re-running local extraction." eta="usually a few seconds" />
       {status ? <p className="status" role="status">{status}</p> : null}
     </section>
   );
