@@ -5,6 +5,7 @@ import {
   listEfastRowsForReview,
 } from '../db/repository';
 import { normalizePlanNumber } from '../ingest/planNumber';
+import { ProcessStatus } from './ProcessStatus';
 
 interface Row { [key: string]: unknown }
 
@@ -121,7 +122,8 @@ export function EfastRowReviewPanel({
         <p className="panel-description">
           Ragtime is keeping only rows whose plan number matches this case. All other rows stay in the database as non-target source rows.
         </p>
-        <p className="status" role="status">{status || 'Filtering locally…'}</p>
+        <ProcessStatus active label={`Filtering CSV to plan number ${normalizePlanNumber(storedPlanNumber)}`} detail="Classifying target rows and preserving all non-target rows for provenance." eta="usually under 5 seconds" />
+        {status ? <p className="status" role="status">{status}</p> : null}
       </section>
     );
   }
@@ -158,6 +160,7 @@ export function EfastRowReviewPanel({
       <p className="action-hint">
         Example: choosing plan number 2 automatically excludes plan numbers 3 and 501. No Link is opened or fetched.
       </p>
+      <ProcessStatus active={working} label="Applying plan-number filter" detail="Updating target filings locally." eta="usually under 5 seconds" />
       {status ? <p className="status" role="status">{status}</p> : null}
     </section>
   );
