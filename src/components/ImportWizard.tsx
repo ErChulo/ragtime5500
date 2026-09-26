@@ -67,7 +67,7 @@ export function ImportWizard({ refreshToken, onChanged }: { refreshToken: number
         <button
           type="button"
           className={step === 'pdf' ? 'substep active' : 'substep'}
-          disabled={!reviewComplete}
+          disabled={!reviewComplete || efastImportId === null}
           onClick={() => setStep('pdf')}
         >
           <span>3</span> Local PDFs
@@ -78,7 +78,7 @@ export function ImportWizard({ refreshToken, onChanged }: { refreshToken: number
       {step === 'review' && efastImportId !== null ? (
         <EfastRowReviewPanel efastImportId={efastImportId} onComplete={reviewFinished} />
       ) : null}
-      {step === 'pdf' ? <PdfImportPanel onImported={onChanged} /> : null}
+      {step === 'pdf' && efastImportId !== null ? <PdfImportPanel efastImportId={efastImportId} onImported={onChanged} /> : null}
     </section>
   );
 }
