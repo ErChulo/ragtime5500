@@ -2,6 +2,7 @@ import { db } from './client';
 import type { EfastRow, Extracted5500Value } from '../types/domain';
 import type { StoredFile } from '../ingest/opfsFiles';
 import type { MatchableEfastRow } from '../matching/matchPdf';
+import { normalizePlanNumber, samePlanNumber } from '../ingest/planNumber';
 
 function sourceTypeFor(category: 'csv' | 'pdf' | 'backup' | 'other'): string {
   if (category === 'csv') return 'EFAST_CSV';
@@ -90,6 +91,64 @@ export async function listEfastRowsForReview(efastImportId: number): Promise<Arr
     WHERE efast_import_id=?
     ORDER BY row_number
   `, [efastImportId]);
+}
+
+export async function getEfastImportCasePlanNumber(efastImportId: number): Promise<string | null> {
+  const rows = await db.exec<{ plan_number: string | null }>(`
+    SELECT p.plan_number
+    FROM efast_import ei
+    LEFT JOIN plan p ON p.case_id=ei.case_id
+    WHERE ei.efast_import_id=?
+    ORDER BY p.plan_id
+    LIMIT 1
+  `, [efastImportId]);
+  return rows[0]?.plan_number ?? null;
+}
+
+export async function classifyEfastImportByPlanNumber(
+  efastImportId: number,
+  targetPlanNumber: string,
+): Promise<{ included: number; excluded: number }> {
+  const normalizedTarget = normalizePlanNumber(targetPlanNumber);
+  if (!normalizedTarget) throw new Error('Choose a valid plan number.');
+
+  const importRows = await db.exec<Record<string, unknown>>(`
+    SELECT er.import_row_id,er.plan_number,er.classification_status,ei.case_id
+    FROM efast_import_row er
+    JOIN efast_import ei ON ei.efast_import_id=er.efast_import_id
+    WHERE er.efast_import_id=?
+    ORDER BY er.row_number
+  `, [efastImportId]);
+
+  if (!importRows.length) throw new Error('This eFAST import has no rows.');
+
+  const caseId = importRows[0].case_id == null ? null : Number(importRows[0].case_id);
+  if (caseId === null) throw new Error('This eFAST import is not associated with a case.');
+
+  const planId = await ensureCasePlan(caseId);
+  await db.transaction([
+    {
+      sql: 'UPDATE plan SET plan_number=?,updated_at=CURRENT_TIMESTAMP WHERE plan_id=?',
+      bind: [targetPlanNumber.trim(), planId],
+    },
+    {
+      sql: `INSERT INTO audit_log(entity_type,entity_id,action,old_value,new_value)
+            VALUES('EFAST_IMPORT',?,'SET_TARGET_PLAN_NUMBER',NULL,
+                   json_object('plan_number',?))`,
+      bind: [efastImportId, targetPlanNumber.trim()],
+    },
+  ]);
+
+  let included = 0;
+  let excluded = 0;
+  for (const row of importRows) {
+    const include = samePlanNumber(row.plan_number, normalizedTarget);
+    await classifyEfastRow(Number(row.import_row_id), include);
+    if (include) included += 1;
+    else excluded += 1;
+  }
+
+  return { included, excluded };
 }
 
 export async function classifyEfastRow(
