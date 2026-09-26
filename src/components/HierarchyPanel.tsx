@@ -148,8 +148,8 @@ export function HierarchyPanel({
       </div>
 
       <div className="single-step-marker" aria-label="Current setup step">
-        <span>1</span>
-        <strong>Case</strong>
+        <span>1</span>{' '}
+        <strong>Case</strong>{' '}
         <em>Next: import eFAST CSV</em>
       </div>
 
