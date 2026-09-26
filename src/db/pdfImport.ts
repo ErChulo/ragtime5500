@@ -14,14 +14,14 @@ export interface PdfImportPreflight {
   problems: string[];
 }
 
-interface ImportContext {
+interface ImportContext extends Record<string, unknown> {
   case_id: number;
   case_name: string;
   plan_id: number | null;
   plan_number: string | null;
 }
 
-interface TargetRow {
+interface TargetRow extends Record<string, unknown> {
   import_row_id: number;
   plan_number: string | null;
   plan_name: string | null;
