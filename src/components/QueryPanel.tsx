@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { queryValue } from '../db/repository';
 import { downloadCsv } from '../utils/csvExport';
 import { ProvenanceCard } from './ProvenanceCard';
+import { ProcessStatus } from './ProcessStatus';
 
 export function QueryPanel() {
   const [year, setYear] = useState(2024);
@@ -12,8 +13,10 @@ export function QueryPanel() {
   const [concept, setConcept] = useState('');
   const [rows, setRows] = useState<Array<Record<string, unknown>>>([]);
   const [status, setStatus] = useState('');
+  const [working, setWorking] = useState(false);
 
   const run = async () => {
+    setWorking(true);
     try {
       const result = await queryValue({
         year,
@@ -28,6 +31,8 @@ export function QueryPanel() {
     } catch (error) {
       setRows([]);
       setStatus(error instanceof Error ? error.message : String(error));
+    } finally {
+      setWorking(false);
     }
   };
 
@@ -49,7 +54,7 @@ export function QueryPanel() {
         <label>Canonical concept<input value={concept} onChange={(event) => setConcept(event.target.value)} placeholder="Optional" /></label>
       </div>
       <div className="panel-actions">
-        <button type="button" onClick={run}>Run structured query</button>
+        <button type="button" onClick={run} disabled={working}>{working ? 'Querying…' : 'Run structured query'}</button>
         <button
           className="button-secondary"
           type="button"
@@ -60,6 +65,7 @@ export function QueryPanel() {
         </button>
         <span className="action-hint">Results include their complete source provenance.</span>
       </div>
+      <ProcessStatus active={working} label="Querying SQLite" detail="Looking up the authoritative structured value and provenance." eta="usually under 1 second" />
       {status ? <p className="status" role="status">{status}</p> : null}
       <div className="cards">{rows.map((row) => <ProvenanceCard key={String(row.filing_value_id)} row={row} />)}</div>
     </section>
