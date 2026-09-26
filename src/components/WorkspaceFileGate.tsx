@@ -1,12 +1,22 @@
+import { ProcessStatus } from './ProcessStatus';
+
 interface Props {
   databaseReady: boolean;
   supported: boolean;
   status: string;
   onOpen: () => void;
   onCreate: () => void;
+  busy?: boolean;
 }
 
-export function WorkspaceFileGate({ databaseReady, supported, status, onOpen, onCreate }: Props) {
+export function WorkspaceFileGate({
+  databaseReady,
+  supported,
+  status,
+  onOpen,
+  onCreate,
+  busy = false,
+}: Props) {
   return (
     <main className="workspace workspace-gate" id="main-content">
       <section className="workspace-file-card simple-gate" aria-labelledby="workspace-file-title">
@@ -23,15 +33,22 @@ export function WorkspaceFileGate({ databaseReady, supported, status, onOpen, on
         ) : null}
 
         <div className="workspace-choice-grid">
-          <button type="button" onClick={onOpen} disabled={!databaseReady || !supported}>
+          <button type="button" onClick={onOpen} disabled={!databaseReady || !supported || busy}>
             <strong>Open my existing workspace</strong>
             <span>I already created a Ragtime .sqlite3 file.</span>
           </button>
-          <button className="button-secondary" type="button" onClick={onCreate} disabled={!databaseReady || !supported}>
+          <button className="button-secondary" type="button" onClick={onCreate} disabled={!databaseReady || !supported || busy}>
             <strong>Create a new workspace</strong>
             <span>This is my first time using this case database.</span>
           </button>
         </div>
+
+        <ProcessStatus
+          active={busy}
+          label="Working with the local SQLite workspace"
+          detail={status || 'Opening or creating the selected local file.'}
+          eta="usually under 5 seconds"
+        />
 
         <details className="why-workspace">
           <summary>What is a workspace?</summary>
