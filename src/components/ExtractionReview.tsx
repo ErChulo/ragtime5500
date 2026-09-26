@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { correctNumericValue, deleteFilingValue, listExtractionReview, verifyValue } from '../db/repository';
 import { ProvenanceCard } from './ProvenanceCard';
+import { ProcessStatus } from './ProcessStatus';
 
 export function ExtractionReview({ refreshToken, onChanged }: { refreshToken: number; onChanged: () => void }) {
   const [rows, setRows] = useState<Array<Record<string, unknown>>>([]);
@@ -8,6 +9,7 @@ export function ExtractionReview({ refreshToken, onChanged }: { refreshToken: nu
   const [correction, setCorrection] = useState('');
   const [reason, setReason] = useState('');
   const [status, setStatus] = useState('');
+  const [working, setWorking] = useState(false);
 
   const load = async () => {
     const next = await listExtractionReview();
@@ -22,6 +24,7 @@ export function ExtractionReview({ refreshToken, onChanged }: { refreshToken: nu
   const selected = rows.find((row) => Number(row.filing_value_id) === selectedId) ?? null;
 
   const run = async (action: () => Promise<void>, message: string) => {
+    setWorking(true);
     try {
       await action();
       setStatus(message);
@@ -29,6 +32,8 @@ export function ExtractionReview({ refreshToken, onChanged }: { refreshToken: nu
       onChanged();
     } catch (error) {
       setStatus(error instanceof Error ? error.message : String(error));
+    } finally {
+      setWorking(false);
     }
   };
 
@@ -51,18 +56,19 @@ export function ExtractionReview({ refreshToken, onChanged }: { refreshToken: nu
         </label>
         {selected ? <ProvenanceCard row={selected} /> : null}
         {selectedId !== null ? <div className="review-actions">
-          <button type="button" onClick={() => run(() => verifyValue(selectedId), 'Value marked USER_VERIFIED.')}>Verify source value</button>
+          <button type="button" disabled={working} onClick={() => run(() => verifyValue(selectedId), 'Value marked USER_VERIFIED.')}>{working ? 'Saving…' : 'Verify source value'}</button>
           <label>Correct numeric value<input inputMode="decimal" value={correction} onChange={(e) => setCorrection(e.target.value)} /></label>
           <label>Correction reason<input value={reason} onChange={(e) => setReason(e.target.value)} /></label>
-          <button type="button" disabled={!correction.trim() || !reason.trim() || !Number.isFinite(Number(correction))}
+          <button type="button" disabled={working || !correction.trim() || !reason.trim() || !Number.isFinite(Number(correction))}
             onClick={() => run(() => correctNumericValue(selectedId, Number(correction), reason.trim()), 'Correction saved; original revision preserved.')}>Save correction</button>
-          <button className="danger" type="button" onClick={() => {
+          <button className="danger" type="button" disabled={working} onClick={() => {
             if (confirm('Delete this current filing value? The deletion is recorded in the audit log.')) {
               void run(() => deleteFilingValue(selectedId), 'Value deleted; audit entry retained.');
             }
           }}>Delete value</button>
         </div> : null}
       </>}
+      <ProcessStatus active={working} label="Saving extraction review" detail="Writing the verification or correction and audit history to SQLite." eta="usually under 2 seconds" />
       {status ? <p className="status" role="status">{status}</p> : null}
     </section>
   );

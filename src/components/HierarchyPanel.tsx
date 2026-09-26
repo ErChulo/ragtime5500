@@ -6,6 +6,7 @@ import {
   listCases,
   updateCaseContext,
 } from '../db/repository';
+import { ProcessStatus } from './ProcessStatus';
 
 interface Row { [key: string]: unknown }
 
@@ -148,8 +149,8 @@ export function HierarchyPanel({
       </div>
 
       <div className="single-step-marker" aria-label="Current setup step">
-        <span>1</span>
-        <strong>Case</strong>
+        <span>1</span>{' '}
+        <strong>Case</strong>{' '}
         <em>Next: import eFAST CSV</em>
       </div>
 
@@ -273,6 +274,7 @@ export function HierarchyPanel({
         )}
       </div>
 
+      <ProcessStatus active={working} label="Saving case locally" detail="Writing the case record and audit history to SQLite." eta="usually under 2 seconds" />
       {status ? <p className="status" role="status">{status}</p> : null}
     </section>
   );

@@ -1,7 +1,20 @@
-import { useEffect, useMemo, useState } from 'react';
-import { classifyEfastRow, listEfastRowsForReview } from '../db/repository';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  classifyEfastImportByPlanNumber,
+  getEfastImportCasePlanNumber,
+  listEfastRowsForReview,
+} from '../db/repository';
+import { normalizePlanNumber } from '../ingest/planNumber';
+import { ProcessStatus } from './ProcessStatus';
 
 interface Row { [key: string]: unknown }
+
+interface PlanNumberGroup {
+  key: string;
+  display: string;
+  count: number;
+  names: string[];
+}
 
 export function EfastRowReviewPanel({
   efastImportId,
@@ -11,12 +24,19 @@ export function EfastRowReviewPanel({
   onComplete: () => void;
 }) {
   const [rows, setRows] = useState<Row[]>([]);
+  const [storedPlanNumber, setStoredPlanNumber] = useState<string | null>(null);
   const [working, setWorking] = useState(false);
   const [status, setStatus] = useState('');
+  const [summary, setSummary] = useState<{ included: number; excluded: number } | null>(null);
+  const autoApplied = useRef(false);
 
   const load = async () => {
-    const next = await listEfastRowsForReview(efastImportId);
-    setRows(next);
+    const [nextRows, planNumber] = await Promise.all([
+      listEfastRowsForReview(efastImportId),
+      getEfastImportCasePlanNumber(efastImportId),
+    ]);
+    setRows(nextRows);
+    setStoredPlanNumber(planNumber);
   };
 
   useEffect(() => {
@@ -27,18 +47,34 @@ export function EfastRowReviewPanel({
     () => rows.filter((row) => String(row.classification_status) === 'NEEDS_REVIEW'),
     [rows],
   );
-  const current = pending[0] ?? null;
-  const included = rows.filter((row) => Number(row.included_for_matching) === 1).length;
-  const excluded = rows.filter((row) => String(row.classification_status) === 'NON_TARGET').length;
-  const reviewed = rows.length - pending.length;
 
-  const classify = async (include: boolean) => {
-    if (!current) return;
+  const groups = useMemo(() => {
+    const byPlanNumber = new Map<string, PlanNumberGroup>();
+    for (const row of rows) {
+      const key = normalizePlanNumber(row.plan_number);
+      if (!key) continue;
+      const existing = byPlanNumber.get(key) ?? {
+        key,
+        display: String(row.plan_number).trim(),
+        count: 0,
+        names: [],
+      };
+      existing.count += 1;
+      const name = row.plan_name == null ? '' : String(row.plan_name).trim();
+      if (name && !existing.names.includes(name)) existing.names.push(name);
+      byPlanNumber.set(key, existing);
+    }
+    return [...byPlanNumber.values()].sort((a, b) => Number(a.key) - Number(b.key));
+  }, [rows]);
+
+  const applyFilter = async (planNumber: string) => {
     setWorking(true);
-    setStatus('');
+    setStatus(`Filtering the CSV to plan number ${planNumber}…`);
     try {
-      await classifyEfastRow(Number(current.import_row_id), include);
+      const result = await classifyEfastImportByPlanNumber(efastImportId, planNumber);
+      setSummary(result);
       await load();
+      setStatus('');
     } catch (error) {
       setStatus(error instanceof Error ? error.message : String(error));
     } finally {
@@ -46,14 +82,30 @@ export function EfastRowReviewPanel({
     }
   };
 
-  if (!current) {
+  useEffect(() => {
+    if (
+      storedPlanNumber &&
+      pending.length > 0 &&
+      !working &&
+      !autoApplied.current
+    ) {
+      autoApplied.current = true;
+      void applyFilter(storedPlanNumber);
+    }
+  }, [storedPlanNumber, pending.length]);
+
+  const included = rows.filter((row) => Number(row.included_for_matching) === 1).length;
+  const excluded = rows.filter((row) => String(row.classification_status) === 'NON_TARGET').length;
+  const complete = rows.length > 0 && pending.length === 0;
+
+  if (complete) {
     return (
       <section className="panel efast-review-card">
         <p className="eyebrow">Step 3</p>
-        <h2>CSV review complete</h2>
+        <h2>Plan-number filter complete</h2>
         <p className="panel-description">
-          {included} row{included === 1 ? '' : 's'} will be used as this case&apos;s Form 5500 filings.
-          {excluded ? ` ${excluded} row${excluded === 1 ? '' : 's'} were kept but excluded.` : ''}
+          Ragtime will use {summary?.included ?? included} row{(summary?.included ?? included) === 1 ? '' : 's'} for this case.
+          {' '}{summary?.excluded ?? excluded} other row{(summary?.excluded ?? excluded) === 1 ? '' : 's'} remain preserved but are ignored for PDF matching.
         </p>
         <div className="panel-actions">
           <button type="button" onClick={onComplete}>Continue to local PDFs</button>
@@ -62,41 +114,53 @@ export function EfastRowReviewPanel({
     );
   }
 
+  if (storedPlanNumber && pending.length > 0) {
+    return (
+      <section className="panel efast-review-card">
+        <p className="eyebrow">Step 3 · Filter CSV</p>
+        <h2>Using plan number {normalizePlanNumber(storedPlanNumber)}</h2>
+        <p className="panel-description">
+          Ragtime is keeping only rows whose plan number matches this case. All other rows stay in the database as non-target source rows.
+        </p>
+        <ProcessStatus active label={`Filtering CSV to plan number ${normalizePlanNumber(storedPlanNumber)}`} detail="Classifying target rows and preserving all non-target rows for provenance." eta="usually under 5 seconds" />
+        {status ? <p className="status" role="status">{status}</p> : null}
+      </section>
+    );
+  }
+
   return (
     <section className="panel efast-review-card">
       <div className="review-progress-line">
         <div>
-          <p className="eyebrow">Step 3 · Review CSV rows</p>
-          <h2>Does this row belong to this pension case?</h2>
+          <p className="eyebrow">Step 3 · Choose once</p>
+          <h2>Which plan number is this case?</h2>
         </div>
-        <strong>{reviewed + 1} of {rows.length}</strong>
       </div>
 
-      <div className="efast-row-summary">
-        <dl>
-          <div><dt>Plan year</dt><dd>{current.plan_year == null ? 'Not reported' : String(current.plan_year)}</dd></div>
-          <div><dt>Plan name</dt><dd>{current.plan_name == null ? 'Not reported' : String(current.plan_name)}</dd></div>
-          <div><dt>Plan number</dt><dd>{current.plan_number == null ? 'Not reported' : String(current.plan_number)}</dd></div>
-          <div><dt>Date received</dt><dd>{current.date_received == null ? 'Not reported' : String(current.date_received)}</dd></div>
-          <div><dt>Plan codes</dt><dd>{current.plan_codes == null ? 'Not reported' : String(current.plan_codes)}</dd></div>
-        </dl>
-      </div>
-
-      <p className="review-question">
-        Choose <strong>Use as Form 5500</strong> only if this row is the pension plan filing you want Ragtime to match to a local PDF.
-        Other arrangements remain preserved in the database but are excluded from matching.
+      <p className="panel-description">
+        Ragtime found {groups.length} plan number{groups.length === 1 ? '' : 's'} in the CSV.
+        Choose the case&apos;s plan number once. Ragtime will automatically keep every matching row and ignore the others.
       </p>
 
-      <div className="decision-actions">
-        <button type="button" disabled={working} onClick={() => void classify(true)}>
-          {working ? 'Saving…' : 'Use as Form 5500'}
-        </button>
-        <button className="button-secondary" type="button" disabled={working} onClick={() => void classify(false)}>
-          Not this case filing
-        </button>
+      <div className="plan-number-options">
+        {groups.map((group) => (
+          <button
+            key={group.key}
+            type="button"
+            disabled={working}
+            onClick={() => void applyFilter(group.display)}
+          >
+            <strong>Plan number {group.key}</strong>
+            <span>{group.count} row{group.count === 1 ? '' : 's'}</span>
+            {group.names[0] ? <small>{group.names[0]}</small> : null}
+          </button>
+        ))}
       </div>
 
-      <p className="action-hint">Nothing is fetched from the Link column. This review is entirely local.</p>
+      <p className="action-hint">
+        Example: choosing plan number 2 automatically excludes plan numbers 3 and 501. No Link is opened or fetched.
+      </p>
+      <ProcessStatus active={working} label="Applying plan-number filter" detail="Updating target filings locally." eta="usually under 5 seconds" />
       {status ? <p className="status" role="status">{status}</p> : null}
     </section>
   );

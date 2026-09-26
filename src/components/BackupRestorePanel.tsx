@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { createWorkspaceArchive, restoreWorkspaceArchive } from '../backup/workspaceArchive';
 import { db } from '../db/client';
+import { ProcessStatus } from './ProcessStatus';
+import { versionedArtifactName } from '../version';
 
 function downloadBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
@@ -25,26 +27,30 @@ export function BackupRestorePanel({ onRestored }: { onRestored: () => void }) {
   const [workspaceFile, setWorkspaceFile] = useState<File | null>(null);
   const [status, setStatus] = useState('');
   const [working, setWorking] = useState(false);
+  const [operation, setOperation] = useState('');
 
   const exportDb = async () => {
     setWorking(true);
+    setOperation('Exporting SQLite backup');
     try {
       const bytes = await db.exportDatabase();
-      downloadBytes(bytes, `ragtime5500-backup-${new Date().toISOString().slice(0, 10)}.sqlite3`, 'application/x-sqlite3');
+      downloadBytes(bytes, versionedArtifactName('ragtime5500-backup', 'sqlite3'), 'application/x-sqlite3');
       setStatus(`Database backup created locally (${bytes.byteLength.toLocaleString()} bytes). SQLite integrity checks passed before export.`);
     } catch (error) {
       setStatus(`Backup failed: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
       setWorking(false);
+      setOperation('');
     }
   };
 
   const exportWorkspace = async () => {
     setWorking(true);
+    setOperation('Exporting full workspace');
     setStatus('Verifying the SQLite database and all stored source documents before creating the workspace archive…');
     try {
       const { blob, result } = await createWorkspaceArchive();
-      downloadBlob(blob, `ragtime5500-workspace-${new Date().toISOString().slice(0, 10)}.r5500`);
+      downloadBlob(blob, versionedArtifactName('ragtime5500-workspace', 'r5500'));
       setStatus(
         `Full workspace backup created locally: ${result.documentCount} source document${result.documentCount === 1 ? '' : 's'}, ${result.archiveBytes.toLocaleString()} bytes total.`,
       );
@@ -52,12 +58,14 @@ export function BackupRestorePanel({ onRestored }: { onRestored: () => void }) {
       setStatus(`Workspace backup failed: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
       setWorking(false);
+      setOperation('');
     }
   };
 
   const restoreDb = async () => {
     if (!restoreFile || !confirm('Restore this SQLite backup? Current database contents will be replaced only if the candidate passes migration, integrity, and foreign-key checks.')) return;
     setWorking(true);
+    setOperation('Restoring SQLite backup');
     try {
       const bytes = await restoreFile.arrayBuffer();
       const result = await db.restoreDatabase(bytes);
@@ -70,12 +78,14 @@ export function BackupRestorePanel({ onRestored }: { onRestored: () => void }) {
       setStatus(`Restore failed: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
       setWorking(false);
+      setOperation('');
     }
   };
 
   const restoreWorkspace = async () => {
     if (!workspaceFile || !confirm('Restore this full Ragtime 5500 workspace? The archive will be hash-verified before source files and the SQLite database are restored.')) return;
     setWorking(true);
+    setOperation('Restoring full workspace');
     setStatus('Validating full workspace archive locally…');
     try {
       const result = await restoreWorkspaceArchive(workspaceFile);
@@ -88,6 +98,7 @@ export function BackupRestorePanel({ onRestored }: { onRestored: () => void }) {
       setStatus(`Workspace restore failed: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
       setWorking(false);
+      setOperation('');
     }
   };
 
@@ -146,6 +157,7 @@ export function BackupRestorePanel({ onRestored }: { onRestored: () => void }) {
       <p className="backup-note">
         Full workspace archives verify SHA-256 for the SQLite payload and every source document before restoration. All processing and downloads remain local to the browser.
       </p>
+      <ProcessStatus active={working} label={operation || 'Working locally'} detail="Ragtime is verifying data before completing this operation." eta="a few seconds; large workspaces may take longer" />
       {status ? <p className="status" role="status">{status}</p> : null}
     </section>
   );

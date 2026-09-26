@@ -3,6 +3,7 @@ import { db, type DbDiagnostics } from '../db/client';
 import { listSourceDocuments } from '../db/repository';
 import { readStoredFile } from '../ingest/opfsFiles';
 import { sha256Hex } from '../utils/hash';
+import { ProcessStatus } from './ProcessStatus';
 
 interface SourceFailure {
   filename: string;
@@ -14,10 +15,14 @@ export function DatabaseHealthPanel() {
   const [failures, setFailures] = useState<SourceFailure[]>([]);
   const [status, setStatus] = useState('Integrity has not been checked in this session.');
   const [working, setWorking] = useState(false);
+  const [checkedCount, setCheckedCount] = useState(0);
+  const [documentCount, setDocumentCount] = useState(0);
 
   const run = async () => {
     setWorking(true);
     setFailures([]);
+    setCheckedCount(0);
+    setDocumentCount(0);
     setStatus('Checking the SQLite workspace and verifying embedded source-document hashes…');
 
     try {
@@ -32,6 +37,7 @@ export function DatabaseHealthPanel() {
       setDiagnostics(after);
 
       const documents = await listSourceDocuments();
+      setDocumentCount(documents.length);
       const nextFailures: SourceFailure[] = [];
       let checked = 0;
 
@@ -52,6 +58,8 @@ export function DatabaseHealthPanel() {
           checked += 1;
         } catch (error) {
           nextFailures.push({ filename, problem: error instanceof Error ? error.message : String(error) });
+        } finally {
+          setCheckedCount((value) => value + 1);
         }
       }
 
@@ -83,6 +91,8 @@ export function DatabaseHealthPanel() {
       <div className="panel-actions">
         <button type="button" onClick={run} disabled={working}>{working ? 'Checking locally…' : 'Run integrity check'}</button>
       </div>
+
+            <ProcessStatus active={working} label="Checking database and source files" detail="Running SQLite checks and verifying local SHA-256 hashes." current={checkedCount} total={documentCount || undefined} eta="large workspaces may take several seconds" />
 
       {diagnostics ? (
         <dl className="health-grid">

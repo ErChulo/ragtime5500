@@ -2,22 +2,27 @@ import { useEffect, useRef, useState } from 'react';
 import { searchDocumentText } from '../db/repository';
 import { readStoredFile } from '../ingest/opfsFiles';
 import { renderPdfPage } from '../pdf/renderPage';
+import { ProcessStatus } from './ProcessStatus';
 
 function EvidencePage({ row }: { row: Record<string, unknown> }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [open, setOpen] = useState(false);
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (!open || !canvasRef.current) return;
     let active = true;
     const run = async () => {
+      setLoading(true);
       try {
         const bytes = await readStoredFile(String(row.storage_key ?? ''));
         if (!active || !canvasRef.current) return;
         await renderPdfPage(bytes, Number(row.page_number), canvasRef.current);
       } catch (cause) {
         if (active) setError(cause instanceof Error ? cause.message : String(cause));
+      } finally {
+        if (active) setLoading(false);
       }
     };
     void run();
@@ -40,6 +45,7 @@ function EvidencePage({ row }: { row: Record<string, unknown> }) {
       <button className="button-secondary" type="button" onClick={() => setOpen((value) => !value)}>
         {open ? 'Hide source page' : 'Show source page'}
       </button>
+      <ProcessStatus active={loading} label="Rendering source page" eta="usually a few seconds" />
       {error ? <p className="error" role="alert">{error}</p> : null}
       {open ? <div className="pdf-canvas-wrap"><canvas ref={canvasRef} /></div> : null}
     </article>
@@ -51,6 +57,7 @@ export function DocumentSearchPanel() {
   const [year, setYear] = useState('');
   const [rows, setRows] = useState<Array<Record<string, unknown>>>([]);
   const [status, setStatus] = useState('');
+  const [working, setWorking] = useState(false);
 
   const run = async () => {
     const trimmed = query.trim();
@@ -60,6 +67,7 @@ export function DocumentSearchPanel() {
       return;
     }
 
+    setWorking(true);
     try {
       const yearNumber = year.trim() ? Number(year) : undefined;
       if (yearNumber !== undefined && !Number.isInteger(yearNumber)) {
@@ -72,6 +80,8 @@ export function DocumentSearchPanel() {
     } catch (error) {
       setRows([]);
       setStatus(`Search failed: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      setWorking(false);
     }
   };
 
@@ -98,9 +108,10 @@ export function DocumentSearchPanel() {
           <span>Plan year (optional)</span>
           <input inputMode="numeric" value={year} onChange={(event) => setYear(event.target.value)} placeholder="Any year" />
         </label>
-        <button type="button" onClick={run}>Search local text</button>
+        <button type="button" onClick={run} disabled={working}>{working ? 'Searching…' : 'Search local text'}</button>
       </div>
 
+      <ProcessStatus active={working} label="Searching local PDF text" detail="SQLite FTS5 is searching the locally indexed document text." eta="usually under 2 seconds" />
       {status ? <p className="status" role="status">{status}</p> : null}
       <div className="evidence-list">{rows.map((row) => <EvidencePage key={String(row.chunk_id)} row={row} />)}</div>
     </section>

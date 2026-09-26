@@ -54,7 +54,8 @@ export function inferDocumentSignals(filename: string, pages: PdfPageText[]): Do
   const planNumber = firstText.match(/plan\s*(?:number|no\.?|#)\s*[:-]?\s*(\d{1,3})\b/i)?.[1] ?? null;
   const ein = firstText.match(/\b(\d{2}-\d{7})\b/)?.[1] ?? null;
   const explicitYear = firstText.match(/plan\s+year(?:\s+beginning)?[^0-9]{0,40}(20\d{2}|19\d{2})/i)?.[1];
-  const planYear = explicitYear ? Number(explicitYear) : null;
+  const filenameYear = filenameStem.match(/^(20\d{2}|19\d{2})$/)?.[1];
+  const planYear = explicitYear ? Number(explicitYear) : filenameYear ? Number(filenameYear) : null;
   const dateMatch = firstText.match(/(?:date\s+(?:received|filed)|filing\s+date)\s*[:-]?\s*(\d{1,2}\/\d{1,2}\/\d{4}|\d{4}-\d{2}-\d{2})/i)?.[1] ?? null;
   const filingDate = dateMatch ? normalizeDateSignal(dateMatch) : null;
   const nameMatch = firstText.match(/name\s+of\s+plan\s*[:-]?\s*(.{5,120}?)(?:plan\s+number|employer|sponsor|ein|$)/i);
@@ -130,6 +131,31 @@ export function scoreCandidate(signals: DocumentSignals, row: MatchableEfastRow)
 }
 
 export function chooseMatch(signals: DocumentSignals, rows: MatchableEfastRow[]): MatchCandidate | null {
+  if (signals.planYear !== null) {
+    const sameYear = rows.filter((row) => row.planYear === signals.planYear);
+    if (sameYear.length === 1) {
+      const candidate = sameYear[0];
+      const planNumberConflict = Boolean(
+        signals.planNumber &&
+        candidate.planNumber &&
+        signals.planNumber.replace(/^0+/, '') !== candidate.planNumber.replace(/^0+/, ''),
+      );
+
+      if (!planNumberConflict) {
+        const scored = scoreCandidate(signals, candidate);
+        return {
+          ...scored,
+          score: Math.max(scored.score, 0.9),
+          status: 'AUTO_ACCEPTED',
+          evidence: {
+            ...scored.evidence,
+            uniqueTargetPlanYear: 'exact',
+          },
+        };
+      }
+    }
+  }
+
   const ranked = rows.map((row) => scoreCandidate(signals, row)).sort((a, b) => b.score - a.score);
   if (!ranked.length || ranked[0].score < 0.35) return null;
 

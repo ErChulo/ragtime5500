@@ -2,6 +2,7 @@ import { db, type DbDiagnostics } from '../db/client';
 import { listSourceDocuments } from '../db/repository';
 import { readStoredFile, writeStoredFile } from '../ingest/opfsFiles';
 import { sha256Hex } from '../utils/hash';
+import { APP_VERSION } from '../version';
 
 const MAGIC_TEXT = 'RAGTIME5500_WORKSPACE_V1\n';
 const MAGIC = new TextEncoder().encode(MAGIC_TEXT);
@@ -20,6 +21,7 @@ interface ArchiveManifest {
   format: 'ragtime5500-workspace';
   version: 1;
   createdAt: string;
+  appVersion?: string;
   sqlite: {
     size: number;
     sha256: string;
@@ -137,6 +139,7 @@ export async function createWorkspaceArchive(): Promise<{ blob: Blob; result: Wo
     format: 'ragtime5500-workspace',
     version: 1,
     createdAt: new Date().toISOString(),
+    appVersion: APP_VERSION,
     sqlite: { size: sqliteBytes.byteLength, sha256: sqliteHash },
     sources,
   };

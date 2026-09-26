@@ -11,6 +11,7 @@ import {
   saveExtractedValues,
   savePdfImport,
 } from '../db/repository';
+import { ProcessStatus } from './ProcessStatus';
 
 interface ImportedResult {
   filename: string;
@@ -22,12 +23,17 @@ export function PdfImportPanel({ onImported }: { onImported: () => void }) {
   const [files, setFiles] = useState<File[]>([]);
   const [results, setResults] = useState<ImportedResult[]>([]);
   const [working, setWorking] = useState(false);
+  const [processedCount, setProcessedCount] = useState(0);
+  const [currentFilename, setCurrentFilename] = useState('');
 
   const importFiles = async () => {
     setWorking(true);
+    setProcessedCount(0);
+    setCurrentFilename('');
     const next: ImportedResult[] = [];
     try {
       for (const file of files) {
+        setCurrentFilename(file.name);
         try {
           const stored = await storeLocalFile(file, 'pdf');
           const sourceDocumentId = await ensureSourceDocument(stored, 'pdf');
@@ -51,6 +57,8 @@ export function PdfImportPanel({ onImported }: { onImported: () => void }) {
           next.push({ filename: file.name, status: saved.matchStatus, detail });
         } catch (error) {
           next.push({ filename: file.name, status: 'ERROR', detail: error instanceof Error ? error.message : String(error) });
+        } finally {
+          setProcessedCount((value) => value + 1);
         }
       }
       setResults(next);
@@ -58,6 +66,7 @@ export function PdfImportPanel({ onImported }: { onImported: () => void }) {
       onImported();
     } finally {
       setWorking(false);
+      setCurrentFilename('');
     }
   };
 
@@ -80,6 +89,14 @@ export function PdfImportPanel({ onImported }: { onImported: () => void }) {
         </button>
         <span className="action-hint">{files.length ? `${files.length} local file${files.length === 1 ? '' : 's'} selected.` : 'No files selected.'}</span>
       </div>
+      <ProcessStatus
+        active={working}
+        label="Importing and matching PDFs locally"
+        detail={currentFilename ? `Processing ${currentFilename}: hash → text extraction → filing match` : 'Preparing local PDF import.'}
+        current={processedCount}
+        total={files.length}
+        eta="large PDFs may take several seconds each"
+      />
       {results.length ? (
         <div className="table-wrap import-results">
           <table>

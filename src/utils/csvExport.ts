@@ -1,3 +1,5 @@
+import { APP_VERSION } from '../version';
+
 function csvCell(value: unknown): string {
   if (value === null || value === undefined) return '';
   const text = String(value);
@@ -14,6 +16,11 @@ export function rowsToCsv(rows: Array<Record<string, unknown>>): string {
   return lines.join('\r\n');
 }
 
+function versionedCsvFilename(filename: string): string {
+  const base = filename.replace(/\.csv$/i, '');
+  return base.includes(`-v${APP_VERSION}`) ? `${base}.csv` : `${base}-v${APP_VERSION}.csv`;
+}
+
 export function downloadCsv(rows: Array<Record<string, unknown>>, filename: string): void {
   const csv = rowsToCsv(rows);
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
@@ -21,7 +28,7 @@ export function downloadCsv(rows: Array<Record<string, unknown>>, filename: stri
   try {
     const anchor = document.createElement('a');
     anchor.href = url;
-    anchor.download = filename;
+    anchor.download = versionedCsvFilename(filename);
     document.body.appendChild(anchor);
     anchor.click();
     anchor.remove();
