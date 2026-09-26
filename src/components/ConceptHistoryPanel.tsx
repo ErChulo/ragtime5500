@@ -1,13 +1,16 @@
 import { useState } from 'react';
 import { queryCanonicalHistory } from '../db/repository';
 import { downloadCsv } from '../utils/csvExport';
+import { ProcessStatus } from './ProcessStatus';
 
 export function ConceptHistoryPanel() {
   const [concept, setConcept] = useState('COMMON_COLLECTIVE_TRUST_VALUE');
   const [rows, setRows] = useState<Array<Record<string, unknown>>>([]);
   const [status, setStatus] = useState('');
+  const [working, setWorking] = useState(false);
 
   const run = async () => {
+    setWorking(true);
     try {
       const result = await queryCanonicalHistory(concept);
       setRows(result);
@@ -15,6 +18,8 @@ export function ConceptHistoryPanel() {
     } catch (error) {
       setRows([]);
       setStatus(error instanceof Error ? error.message : String(error));
+    } finally {
+      setWorking(false);
     }
   };
 
@@ -35,10 +40,11 @@ export function ConceptHistoryPanel() {
           <span>Canonical concept</span>
           <input value={concept} onChange={(event) => setConcept(event.target.value)} />
         </label>
-        <button type="button" disabled={!concept.trim()} onClick={run}>Compare years</button>
+        <button type="button" disabled={!concept.trim() || working} onClick={run}>{working ? 'Comparing…' : 'Compare years'}</button>
         <button className="button-secondary" type="button" disabled={!rows.length} onClick={() => downloadCsv(rows, 'ragtime5500-canonical-history.csv')}>Export CSV</button>
       </div>
 
+      <ProcessStatus active={working} label="Comparing plan years" detail="Reading canonical-concept values from local SQLite." eta="usually under 1 second" />
       {status ? <p className="status" role="status">{status}</p> : null}
       {rows.length ? (
         <div className="table-wrap">
