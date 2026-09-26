@@ -1384,3 +1384,27 @@ button.button-tertiary:hover:not(:disabled) {
   font-size: .7rem;
   font-style: normal;
 }
+
+/* Import screen hierarchy: keep labels and values visually distinct. */
+.import-target {
+  display: grid;
+  gap: .18rem;
+  margin-bottom: .85rem;
+  padding: .65rem .75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: rgba(8, 13, 19, .42);
+}
+.import-target span {
+  color: var(--muted);
+  font-size: .7rem;
+  font-weight: 650;
+}
+.import-target strong {
+  color: var(--text);
+  font-size: .88rem;
+}
+.form-stack > label {
+  display: grid;
+  gap: .38rem;
+}
