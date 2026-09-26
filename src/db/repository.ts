@@ -315,6 +315,11 @@ export async function savePdfImport(
 
   if (!match) {
     statements.push({
+      sql: `DELETE FROM document_match
+            WHERE source_document_id=? AND import_row_id IS NULL AND verification_status='UNMATCHED'`,
+      bind: [sourceDocumentId],
+    });
+    statements.push({
       sql: `INSERT INTO document_match(import_row_id,source_document_id,match_method,match_score,verification_status,evidence_json)
             VALUES(NULL,?,'DETERMINISTIC_METADATA',0,'UNMATCHED','{}')`,
       bind: [sourceDocumentId],
@@ -322,6 +327,12 @@ export async function savePdfImport(
     await db.transaction(statements);
     return { filingId: null, matchStatus: 'UNMATCHED' };
   }
+
+  statements.push({
+    sql: `DELETE FROM document_match
+          WHERE source_document_id=? AND import_row_id IS NULL AND verification_status='UNMATCHED'`,
+    bind: [sourceDocumentId],
+  });
 
   statements.push({
     sql: `UPDATE source_document
