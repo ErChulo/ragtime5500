@@ -7,7 +7,7 @@
 ![SQLite WASM](https://img.shields.io/badge/SQLite-WASM-passing-brightgreen)
 ![Schema contracts](https://img.shields.io/badge/schema%20contracts-passing-brightgreen)
 ![Security audit](https://img.shields.io/badge/security%20audit-passing-brightgreen)
-![Manual acceptance](https://img.shields.io/badge/manual%20acceptance-in%20progress-yellow)
+![Manual acceptance](https://img.shields.io/badge/manual%20acceptance-candidate-blue)
 
 **Offline Form 5500 Case Database + Local Retrieval**
 
@@ -16,7 +16,7 @@
 For the air-gapped office workstation, download the tested standalone HTML from the dedicated `office-builds` branch:
 
 - **[Download latest single-HTML build](https://github.com/ErChulo/ragtime5500/raw/office-builds/ragtime5500-latest.html)**
-- [Download versioned build v0.1.1-test.4](https://github.com/ErChulo/ragtime5500/raw/office-builds/ragtime5500-v0.1.1-test.4.html)
+- [Download versioned build v0.1.1-rc.1](https://github.com/ErChulo/ragtime5500/raw/office-builds/ragtime5500-v0.1.1-rc.1.html)
 - [SHA-256 checksums](https://github.com/ErChulo/ragtime5500/blob/office-builds/SHA256SUMS.txt)
 - [Published version](https://github.com/ErChulo/ragtime5500/blob/office-builds/VERSION.txt)
 

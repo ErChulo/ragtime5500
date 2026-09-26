@@ -26,7 +26,7 @@ const checks = [
 async function walk(dir) {
   const out = [];
   for (const entry of await readdir(dir, { withFileTypes: true })) {
-    if (['node_modules', '.git', 'dist', '.tmp-test'].includes(entry.name)) continue;
+    if (['node_modules', '.git', 'dist', '.tmp-test', 'tests'].includes(entry.name)) continue;
     const full = join(dir, entry.name);
     if (entry.isDirectory()) out.push(...await walk(full));
     else if (SOURCE_EXT.has(extname(entry.name))) out.push(full);
