@@ -11,6 +11,19 @@
 
 **Offline Form 5500 Case Database + Local Retrieval**
 
+## Office download
+
+For the air-gapped office workstation, download the tested standalone HTML from the dedicated `office-builds` branch:
+
+- **[Download latest single-HTML build](https://github.com/ErChulo/ragtime5500/raw/office-builds/ragtime5500-latest.html)**
+- [Download versioned build v0.1.1-test.4](https://github.com/ErChulo/ragtime5500/raw/office-builds/ragtime5500-v0.1.1-test.4.html)
+- [SHA-256 checksums](https://github.com/ErChulo/ragtime5500/blob/office-builds/SHA256SUMS.txt)
+- [Published version](https://github.com/ErChulo/ragtime5500/blob/office-builds/VERSION.txt)
+
+The `office-builds` branch is generated only after the repository test/build/security gates pass on `main`. The downloaded HTML is the complete application and is intended to run locally with the network disconnected.
+
+
+
 Ragtime 5500 is a local-first Vite + React + TypeScript application for importing, storing, tracing, querying, reviewing, and eventually analyzing Form 5500 filings across pension cases and plan years.
 
 The structured SQLite database is authoritative. Full-text retrieval and future local RAG capabilities are secondary layers and may not invent database facts.
