@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { storeLocalFile } from '../ingest/opfsFiles';
 import { parseEfastCsv } from '../ingest/efast';
 import { importEfastRows, listCases } from '../db/repository';
+import { ProcessStatus } from './ProcessStatus';
 
 interface Row { [key: string]: unknown }
 
@@ -103,6 +104,7 @@ export function CsvImportPanel({ onImported }: { onImported: (efastImportId: num
       </div>
 
       <p className="action-hint">The eFAST URL column is stored as provenance text only. Ragtime never opens or fetches it.</p>
+      <ProcessStatus active={working} label="Importing eFAST CSV locally" detail="Hashing the CSV, preserving the raw file, and parsing every row." eta="usually under 5 seconds" />
       {status ? <p className="status" role="status">{status}</p> : null}
     </section>
   );
