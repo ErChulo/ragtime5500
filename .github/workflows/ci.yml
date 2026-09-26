@@ -69,3 +69,60 @@ jobs:
         run: |
           echo "GitHub Actions is development-only infrastructure."
           echo "The production Ragtime 5500 runtime remains local and air-gapped."
+
+  publish-office-build:
+    name: Publish office single-HTML build
+    needs: check
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout source metadata
+        uses: actions/checkout@v4
+
+      - name: Download tested standalone HTML
+        uses: actions/download-artifact@v4
+        with:
+          name: ragtime5500-standalone
+          path: /tmp/ragtime-build
+
+      - name: Publish versioned and latest office downloads
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="$(node -p "require('./package.json').version")"
+          mkdir -p /tmp/ragtime-publish
+          cp /tmp/ragtime-build/ragtime5500.html "/tmp/ragtime-publish/ragtime5500-v${VERSION}.html"
+          cp /tmp/ragtime-build/ragtime5500.html "/tmp/ragtime-publish/ragtime5500-latest.html"
+          (
+            cd /tmp/ragtime-publish
+            sha256sum "ragtime5500-v${VERSION}.html" "ragtime5500-latest.html" > SHA256SUMS.txt
+            printf '%s\n' "${VERSION}" > VERSION.txt
+          )
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          if git ls-remote --exit-code --heads origin office-builds >/dev/null 2>&1; then
+            git fetch origin office-builds
+            git switch -C office-builds origin/office-builds
+          else
+            git switch --orphan office-builds
+            git rm -rf . || true
+          fi
+
+          cp /tmp/ragtime-publish/ragtime5500-v${VERSION}.html .
+          cp /tmp/ragtime-publish/ragtime5500-latest.html .
+          cp /tmp/ragtime-publish/SHA256SUMS.txt .
+          cp /tmp/ragtime-publish/VERSION.txt .
+
+          git add "ragtime5500-v${VERSION}.html" ragtime5500-latest.html SHA256SUMS.txt VERSION.txt
+          if git diff --cached --quiet; then
+            echo "Office build already published."
+            exit 0
+          fi
+          git commit -m "build: publish Ragtime 5500 v${VERSION} [skip ci]"
+          git push origin office-builds
