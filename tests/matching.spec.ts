@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { chooseMatch } from '../src/matching/matchPdf';
+import { chooseMatch, inferDocumentSignals } from '../src/matching/matchPdf';
 import type { DocumentSignals } from '../src/types/domain';
 
 const signals: DocumentSignals = {
@@ -95,3 +95,9 @@ describe('PDF/eFAST matching', () => {
 
     expect(match?.status ?? 'UNMATCHED').not.toBe('AUTO_ACCEPTED');
   });
+
+
+it('infers the plan year from a YYYY.pdf filename when PDF text does not provide it', () => {
+  const inferred = inferDocumentSignals('2009.pdf', []);
+  expect(inferred.planYear).toBe(2009);
+});
