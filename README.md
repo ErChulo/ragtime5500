@@ -137,3 +137,28 @@ Use the step-by-step **[Manual Test Drive](docs/testing-guide.md)**. It is writt
 - user-selected local SQLite workspace persistence
 
 The designated local acceptance filing must only be marked verified after its actual local source PDF is imported and the page-level evidence is reviewed. Real case names, values, PDFs, and CSVs are intentionally absent from this repository.
+
+
+## Artifact versioning
+
+Every user-facing artifact must carry a Ragtime application version.
+
+- The standalone HTML displays the application version in the header and is distributed with a versioned filename.
+- SQLite backups use a filename containing the application version.
+- Full `.r5500` workspace archives use a versioned filename and store the creating application version inside the archive manifest.
+- CSV exports automatically append the application version to the filename.
+- The SQLite schema continues to maintain its independent migration version.
+
+The current stable-test application version is `0.1.1-test.3`.
+
+## Long-running process feedback
+
+Any user-triggered operation that performs local processing should provide visible feedback while it runs. Ragtime uses a consistent progress component with:
+
+- an activity spinner;
+- a plain-language description of the current operation;
+- elapsed time;
+- item counts when the operation processes a batch;
+- a remaining-time estimate when enough progress information exists, otherwise a conservative expected-duration message.
+
+This applies to workspace open/create, CSV ingestion, plan-number filtering, PDF parsing/matching, source-page rendering, searches and SQL queries, verification/correction actions, database integrity checks, and backup/restore.
