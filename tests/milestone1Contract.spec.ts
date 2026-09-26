@@ -1,0 +1,150 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { describe, expect, it } from 'vitest';
+
+function source(relative: string): string {
+  return readFileSync(fileURLToPath(new URL(`../${relative}`, import.meta.url)), 'utf8');
+}
+
+describe('Milestone 1 release contract', () => {
+  it('keeps the package version and visible app version synchronized', () => {
+    const pkg = JSON.parse(source('package.json')) as { version: string };
+    const version = source('src/app/version.ts');
+    expect(pkg.version).toBe('0.1.1-rc.1');
+    expect(version).toContain("APP_VERSION = '0.1.1-rc.1'");
+    expect(version).toContain("APP_CHANNEL = 'Milestone 1 acceptance candidate'");
+  });
+
+  it('enforces connect-src none in the application CSP', () => {
+    expect(source('index.html')).toMatch(/connect-src\s+'none'/);
+  });
+
+  it('keeps the production artifact contract to exactly one HTML file', () => {
+    const audit = source('scripts/audit-singlefile.mjs');
+    expect(audit).toContain("const TARGET = 'ragtime5500.html'");
+    expect(audit).toContain('relativeFiles.length !== 1');
+  });
+
+  it('actively audits prohibited outbound browser APIs', () => {
+    const audit = source('scripts/audit-network.mjs');
+    for (const capability of ['fetch()', 'XMLHttpRequest', 'WebSocket', 'EventSource', 'sendBeacon', 'window.open']) {
+      expect(audit).toContain(capability);
+    }
+  });
+
+  it('smoke-tests the final file over the file protocol', () => {
+    const smoke = source('scripts/browser-file-smoke.mjs');
+    expect(smoke).toContain('pathToFileURL(htmlPath)');
+    expect(smoke).toContain('Network.requestWillBeSent');
+    expect(smoke).toContain('Outbound HTTP(S) request detected');
+  });
+
+  it('requires local file picker APIs for workspace persistence', () => {
+    const smoke = source('scripts/browser-file-smoke.mjs');
+    expect(smoke).toContain('showOpenFilePicker');
+    expect(smoke).toContain('showSaveFilePicker');
+  });
+
+  it('preserves every raw eFAST row before classification', () => {
+    const repository = source('src/db/repository.ts');
+    expect(repository).toContain('raw_row_json');
+    expect(repository).toContain('raw_record_text');
+    expect(repository).toContain("'NEEDS_REVIEW'");
+    expect(repository).toContain('included_for_matching');
+  });
+
+  it('records eFAST target-plan selection in the audit log', () => {
+    const review = source('src/db/efastReview.ts');
+    expect(review).toContain("'SET_TARGET_PLAN_NUMBER'");
+    expect(review).toContain('audit_log');
+  });
+
+  it('uses normalized plan numbers for target filtering', () => {
+    const review = source('src/db/efastReview.ts');
+    expect(review).toContain('normalizePlanNumber');
+    expect(review).toContain('samePlanNumber');
+  });
+
+  it('scopes PDF matching to the selected eFAST import', () => {
+    const pdfImport = source('src/db/pdfImport.ts');
+    expect(pdfImport).toContain('WHERE er.efast_import_id=?');
+    expect(pdfImport).toContain('er.included_for_matching=1');
+  });
+
+  it('keeps unmatched PDFs explicit rather than silently assigning them', () => {
+    const pdfImport = source('src/db/pdfImport.ts');
+    expect(pdfImport).toContain("'UNMATCHED'");
+    expect(pdfImport).toContain('import_row_id IS NULL');
+  });
+
+  it('stores extracted values with source page and source text provenance', () => {
+    const repository = source('src/db/repository.ts');
+    expect(repository).toContain('source_page');
+    expect(repository).toContain('source_text');
+    expect(repository).toContain('extraction_confidence');
+    expect(repository).toContain('verification_status');
+  });
+
+  it('does not overwrite a user-verified extracted value during re-extraction', () => {
+    const repository = source('src/db/repository.ts');
+    expect(repository).toContain("WHERE filing_value.verification_status='EXTRACTED_UNVERIFIED'");
+  });
+
+  it('stores eFAST URLs only as provenance fields', () => {
+    const repository = source('src/db/repository.ts');
+    expect(repository).toContain('original_source_url');
+    expect(source('src/security/externalUrl.ts')).toContain('External HTTP(S) navigation is forbidden');
+  });
+
+  it('verifies source-document hashes before creating a full workspace backup', () => {
+    const archive = source('src/backup/workspaceArchive.ts');
+    expect(archive).toContain('failed SHA-256 verification');
+    expect(archive).toContain('size mismatch');
+  });
+
+  it('validates all archived source payloads before restoring database state', () => {
+    const archive = source('src/backup/workspaceArchive.ts');
+    expect(archive).toContain('First pass: validate every source payload before writing anything.');
+    expect(archive).toContain('unexpected trailing bytes');
+  });
+
+  it('checks SQLite integrity and foreign keys through the health surface', () => {
+    const repository = source('src/db/repository.ts');
+    expect(repository).toContain('PRAGMA quick_check');
+    expect(repository).toContain('PRAGMA foreign_key_check');
+  });
+
+  it('provides deterministic FTS retrieval against local document chunks', () => {
+    const repository = source('src/db/repository.ts');
+    expect(repository).toContain('document_chunk_fts MATCH ?');
+    expect(repository).toContain('snippet(document_chunk_fts');
+  });
+
+  it('provides canonical-concept history independent of line-number layout', () => {
+    const repository = source('src/db/repository.ts');
+    expect(repository).toContain('queryCanonicalHistory');
+    expect(repository).toContain('canonical_concept=?');
+  });
+
+  it('keeps migrations explicitly ordered and versioned', () => {
+    const migrations = source('src/db/migrations.ts');
+    for (const version of [1, 2, 3, 4]) {
+      expect(migrations).toContain(`version: ${version}`);
+    }
+  });
+
+  it('publishes office builds only after the check job succeeds', () => {
+    const ci = source('.github/workflows/ci.yml');
+    expect(ci).toContain('publish-office-build:');
+    expect(ci).toContain('needs: check');
+    expect(ci).toContain('ragtime5500-latest.html');
+    expect(ci).toContain('SHA256SUMS.txt');
+  });
+
+  it('runs schema verification, source tests, build audits, and browser smoke in CI', () => {
+    const ci = source('.github/workflows/ci.yml');
+    expect(ci).toContain('python3 tests/verify_schema.py');
+    expect(ci).toContain('npm run check');
+    expect(ci).toContain('browser-file-smoke.mjs');
+  });
+});
