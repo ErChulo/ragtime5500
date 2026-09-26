@@ -62,7 +62,7 @@ export async function importEfastRows(caseName: string, stored: StoredFile, rows
               participants,participants_eoy,assets_boy,assets_eoy,source_url,raw_row_json,raw_record_text,efast_filing_id,
               matched_filing_id,classification_status,classification_reason,included_for_matching,user_verified
             )
-            SELECT ei.efast_import_id,?,?,?,?,?,?,?,?,?,?,?,?,?,NULL,
+            SELECT ei.efast_import_id,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NULL,
                    'NEEDS_REVIEW','Imported raw row; user classification required',0,0
             FROM efast_import ei WHERE ei.source_document_id=?`,
       bind: [
