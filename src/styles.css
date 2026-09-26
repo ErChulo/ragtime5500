@@ -1408,3 +1408,39 @@ button.button-tertiary:hover:not(:disabled) {
   display: grid;
   gap: .38rem;
 }
+
+.plan-number-options {
+  display: grid;
+  gap: .55rem;
+  margin-top: .85rem;
+}
+.plan-number-options button {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: .2rem .75rem;
+  align-items: center;
+  min-height: 0;
+  padding: .8rem .9rem;
+  text-align: left;
+  background: rgba(8,13,19,.42);
+  border-color: var(--border);
+}
+.plan-number-options button strong {
+  color: var(--text);
+  font-size: .86rem;
+}
+.plan-number-options button span {
+  color: var(--muted-strong);
+  font-size: .74rem;
+}
+.plan-number-options button small {
+  grid-column: 1 / -1;
+  color: var(--muted);
+  font-size: .72rem;
+  line-height: 1.4;
+}
+.plan-number-options button:hover,
+.plan-number-options button:focus-visible {
+  border-color: #5379a8;
+  background: var(--primary-soft);
+}
