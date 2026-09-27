@@ -10,8 +10,8 @@ describe('Milestone 1 release contract', () => {
   it('keeps the package version and visible app version synchronized', () => {
     const pkg = JSON.parse(source('package.json')) as { version: string };
     const version = source('src/app/version.ts');
-    expect(pkg.version).toBe('0.1.1-rc.4');
-    expect(version).toContain("APP_VERSION = '0.1.1-rc.4'");
+    expect(pkg.version).toBe('0.1.1-rc.5');
+    expect(version).toContain("APP_VERSION = '0.1.1-rc.5'");
     expect(version).toContain("APP_CHANNEL = 'Milestone 1 direct-file office candidate'");
   });
 
@@ -108,6 +108,14 @@ describe('Milestone 1 release contract', () => {
     const review = source('src/db/efastReview.ts');
     expect(review).toContain('normalizePlanNumber');
     expect(review).toContain('samePlanNumber');
+  });
+
+  it('auto-excludes stale non-target rows instead of blocking PDF import', () => {
+    const pdfImport = source('src/db/pdfImport.ts');
+    expect(pdfImport).toContain('excludeStaleNonTargetRows');
+    expect(pdfImport).toContain("classification_status='NON_TARGET'");
+    expect(pdfImport).toContain('AUTO_EXCLUDE_NON_TARGET_PRE_PDF');
+    expect(pdfImport).not.toContain('not target plan number');
   });
 
   it('scopes PDF matching to the selected eFAST import', () => {
