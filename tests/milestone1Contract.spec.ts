@@ -10,8 +10,8 @@ describe('Milestone 1 release contract', () => {
   it('keeps the package version and visible app version synchronized', () => {
     const pkg = JSON.parse(source('package.json')) as { version: string };
     const version = source('src/app/version.ts');
-    expect(pkg.version).toBe('0.1.1-rc.6');
-    expect(version).toContain("APP_VERSION = '0.1.1-rc.6'");
+    expect(pkg.version).toBe('0.1.1-rc.7');
+    expect(version).toContain("APP_VERSION = '0.1.1-rc.7'");
     expect(version).toContain("APP_CHANNEL = 'Milestone 1 direct-file office candidate'");
   });
 

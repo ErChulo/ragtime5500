@@ -229,6 +229,17 @@ describe('Milestone 1 Schedule H 1C9 extraction safety', () => {
     expect(values[0].sourcePage).toBe(7);
   });
 
+  it('never accepts the fillable-form 123456789012345 placeholder as a reported amount', () => {
+    const values = extractScheduleH1c9([
+      page('Schedule H Part I', [
+        token('1c(9)', 40), token('common', 110), token('trusts', 220),
+        token('1,250', 650), token('-123,456,789,012,345', 700), token('1,175', 840),
+      ], 7),
+    ]);
+    expect(values.map((value) => value.normalizedNumber)).toEqual([1250, 1175]);
+    expect(values.some((value) => Math.abs(value.normalizedNumber ?? 0) === 123456789012345)).toBe(false);
+  });
+
   it('preserves unverified provenance status for machine extraction', () => {
     const values = extractScheduleH1c9([
       page('Schedule H Part I', [
