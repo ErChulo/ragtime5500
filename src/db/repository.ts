@@ -1032,18 +1032,88 @@ export async function recordStructuredExtraction(
   values: Extracted5500Value[],
   issues: StructuredExtractionIssue[],
 ): Promise<void> {
-  await db.exec(
-    `INSERT INTO audit_log(entity_type,entity_id,action,old_value,new_value)
-     VALUES('FILING',?,'STRUCTURED_EXTRACTION_RUN',NULL,
-            json_object(
-              'engine','METADATA_POSITIONAL_BOY_EOY_V1',
-              'rule_count',?,
-              'value_count',?,
-              'issue_count',?,
-              'issues_json',?
-            ))`,
-    [filingId, ruleCount, values.length, issues.length, JSON.stringify(issues)],
+  const statements: Array<{ sql: string; bind?: (string | number | null)[] }> = [
+    {
+      sql: `UPDATE extraction_issue
+               SET status='RESOLVED_BY_REEXTRACTION',updated_at=CURRENT_TIMESTAMP
+             WHERE filing_id=? AND status='OPEN'`,
+      bind: [filingId],
+    },
+  ];
+
+  for (const issue of issues) {
+    statements.push({
+      sql: `INSERT INTO extraction_issue(
+              filing_id,schedule_name,part,location_reference,issue_code,source_page,source_text,status
+            ) VALUES(?,?,?,?,?,?,?,'OPEN')
+            ON CONFLICT(filing_id,schedule_name,part,location_reference,issue_code) DO UPDATE SET
+              source_page=excluded.source_page,
+              source_text=excluded.source_text,
+              status='OPEN',
+              updated_at=CURRENT_TIMESTAMP`,
+      bind: [
+        filingId,
+        issue.schedule,
+        issue.part,
+        issue.locationReference,
+        issue.reason,
+        issue.sourcePage,
+        issue.sourceText,
+      ],
+    });
+  }
+
+  statements.push({
+    sql: `INSERT INTO audit_log(entity_type,entity_id,action,old_value,new_value)
+          VALUES('FILING',?,'STRUCTURED_EXTRACTION_RUN',NULL,
+                 json_object(
+                   'engine','METADATA_POSITIONAL_BOY_EOY_V1',
+                   'rule_count',?,
+                   'value_count',?,
+                   'issue_count',?,
+                   'issues_json',?
+                 ))`,
+    bind: [filingId, ruleCount, values.length, issues.length, JSON.stringify(issues)],
+  });
+
+  await db.transaction(statements);
+}
+
+export async function listExtractionIssues(
+  includeReviewed = false,
+): Promise<Array<Record<string, unknown>>> {
+  return db.exec(
+    `SELECT ei.extraction_issue_id,ei.schedule_name,ei.part,ei.location_reference,
+            ei.issue_code,ei.source_page,ei.source_text,ei.status,ei.updated_at,
+            f.filing_id,py.year AS plan_year,p.plan_name,p.plan_number,
+            sd.filename AS source_filename,sd.storage_key
+       FROM extraction_issue ei
+       JOIN filing f ON f.filing_id=ei.filing_id
+       JOIN plan_year py ON py.plan_year_id=f.plan_year_id
+       JOIN plan p ON p.plan_id=py.plan_id
+       LEFT JOIN source_document sd ON sd.source_document_id=f.source_document_id
+      WHERE ${includeReviewed ? "ei.status IN ('OPEN','USER_REVIEWED')" : "ei.status='OPEN'"}
+      ORDER BY py.year DESC,ei.schedule_name,ei.part,ei.location_reference`,
   );
+}
+
+export async function markExtractionIssueReviewed(extractionIssueId: number): Promise<void> {
+  await db.transaction([
+    {
+      sql: `INSERT INTO audit_log(entity_type,entity_id,action,old_value,new_value)
+            SELECT 'EXTRACTION_ISSUE',extraction_issue_id,'USER_REVIEW',
+                   status,'USER_REVIEWED'
+              FROM extraction_issue
+             WHERE extraction_issue_id=?`,
+      bind: [extractionIssueId],
+    },
+    {
+      sql: `UPDATE extraction_issue
+               SET status='USER_REVIEWED',updated_at=CURRENT_TIMESTAMP
+             WHERE extraction_issue_id=?`,
+      bind: [extractionIssueId],
+    },
+  ]);
 }
 
 export async function validateScheduleHPartI(
