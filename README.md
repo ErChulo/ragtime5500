@@ -16,7 +16,8 @@
 For the air-gapped office workstation, download the tested standalone HTML from the dedicated `office-builds` branch:
 
 - **[Download latest single-HTML build](https://github.com/ErChulo/ragtime5500/raw/office-builds/ragtime5500-latest.html)**
-- [Download versioned build v0.1.1](https://github.com/ErChulo/ragtime5500/raw/office-builds/ragtime5500-v0.1.1.html)
+- [Download Milestone 2 candidate v0.2.0-rc.1](https://github.com/ErChulo/ragtime5500/raw/office-builds/ragtime5500-v0.2.0-rc.1.html)
+- [Download accepted Milestone 1 stable v0.1.1](https://github.com/ErChulo/ragtime5500/raw/office-builds/ragtime5500-v0.1.1.html)
 - [SHA-256 checksums](https://github.com/ErChulo/ragtime5500/blob/office-builds/SHA256SUMS.txt)
 - [Published version](https://github.com/ErChulo/ragtime5500/blob/office-builds/VERSION.txt)
 
@@ -44,7 +45,7 @@ The interface therefore follows these rules:
 - reserve advanced SQL, diagnostics, and maintenance tools for explicit disclosure;
 - treat supervisor-ready deliverables as a first-class product requirement after the Milestone 1 vertical slice is accepted.
 
-For the complete manual walkthrough, see **[docs/testing-guide.md](docs/testing-guide.md)**. The accepted Milestone 1 record is in **[docs/milestone-1-acceptance.md](docs/milestone-1-acceptance.md)**, and version history is in **[CHANGELOG.md](CHANGELOG.md)**.
+For the accepted Milestone 1 walkthrough, see **[docs/testing-guide.md](docs/testing-guide.md)**. The accepted Milestone 1 record is in **[docs/milestone-1-acceptance.md](docs/milestone-1-acceptance.md)**. Milestone 2 scope and acceptance are in **[docs/milestone-2-plan.md](docs/milestone-2-plan.md)** and **[docs/milestone-2-test-plan.md](docs/milestone-2-test-plan.md)**. Version history is in **[CHANGELOG.md](CHANGELOG.md)**.
 
 ## Primary user workflow
 
@@ -152,3 +153,21 @@ Use the step-by-step **[Manual Test Drive](docs/testing-guide.md)**. It is writt
 - user-selected local SQLite workspace persistence
 
 The designated local acceptance filing must only be marked verified after its actual local source PDF is imported and the page-level evidence is reviewed. Real case names, values, PDFs, and CSVs are intentionally absent from this repository.
+
+
+## Milestone 2 candidate scope
+
+Version **v0.2.0-rc.1** generalizes the accepted Milestone 1 extraction path into a metadata-driven Schedule H engine while preserving the same offline/direct-file architecture.
+
+The candidate adds:
+
+- SQLite-backed extraction definitions rather than a one-off hard-coded 1C9 implementation;
+- 2024 Schedule H Part I rules for 11 supported locations and up to 22 BOY/EOY structured fields;
+- stable canonical concepts for each supported location;
+- re-extraction of already-imported local PDFs without re-importing or renaming them;
+- explicit extraction-issue review for missing or ambiguous source lines;
+- deterministic validation of the Schedule H Part I identity `1L = 1F - 1K` when all required values are present;
+- year-over-year canonical-concept deltas without replacing the authoritative stored values;
+- progress/status feedback for extraction, review, validation, and comparison operations.
+
+Milestone 2 remains a **release candidate** until the designated real 2024 filing is re-extracted and the newly supported values are checked against the actual local Schedule H source page on the target office workstation. The accepted Milestone 1 baseline remains v0.1.1 until that validation is complete.
