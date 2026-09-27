@@ -44,7 +44,7 @@ The interface therefore follows these rules:
 - reserve advanced SQL, diagnostics, and maintenance tools for explicit disclosure;
 - treat supervisor-ready deliverables as a first-class product requirement after the Milestone 1 vertical slice is accepted.
 
-For the complete manual walkthrough, see **[docs/testing-guide.md](docs/testing-guide.md)**.
+For the complete manual walkthrough, see **[docs/testing-guide.md](docs/testing-guide.md)**. The accepted Milestone 1 record is in **[docs/milestone-1-acceptance.md](docs/milestone-1-acceptance.md)**, and version history is in **[CHANGELOG.md](CHANGELOG.md)**.
 
 ## Primary user workflow
 
