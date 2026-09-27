@@ -13,15 +13,14 @@
 
 ## Office download
 
-For managed office workstations, the preferred download is the tested **office ZIP** from the dedicated `office-builds` branch:
+For the air-gapped office workstation, download the tested standalone HTML from the dedicated `office-builds` branch:
 
-- **[Download latest office package](https://github.com/ErChulo/ragtime5500/raw/office-builds/ragtime5500-office-latest.zip)** — extract it and double-click `Start-Ragtime5500.cmd`.
-- [Download versioned office package v0.1.1-rc.3](https://github.com/ErChulo/ragtime5500/raw/office-builds/ragtime5500-office-v0.1.1-rc.3.zip)
-- [Download standalone HTML v0.1.1-rc.3](https://github.com/ErChulo/ragtime5500/raw/office-builds/ragtime5500-v0.1.1-rc.3.html) — use only where the browser permits local `file://` pages.
+- **[Download latest single-HTML build](https://github.com/ErChulo/ragtime5500/raw/office-builds/ragtime5500-latest.html)**
+- [Download versioned build v0.1.1-rc.4](https://github.com/ErChulo/ragtime5500/raw/office-builds/ragtime5500-v0.1.1-rc.4.html)
 - [SHA-256 checksums](https://github.com/ErChulo/ragtime5500/blob/office-builds/SHA256SUMS.txt)
 - [Published version](https://github.com/ErChulo/ragtime5500/blob/office-builds/VERSION.txt)
 
-The office package is generated only after the repository test/build/security gates pass on `main`. It contains the same fully embedded HTML plus a loopback-only launcher for managed browsers that block `file://`. The launcher binds only to `127.0.0.1`; it does not create an outbound network dependency.
+The `office-builds` branch is generated only after the repository test/build/security gates pass on `main`. The downloaded HTML is the complete application and is intended to open directly from local disk with the network disconnected.
 
 
 
@@ -67,7 +66,7 @@ The production application is exactly one standalone file:
 
 `dist/ragtime5500.html`
 
-The HTML can be opened directly with `file://` where enterprise browser policy permits it. Managed browsers may block all local file pages before the application code can execute; for those workstations, the office package includes a loopback-only launcher that serves the same HTML at `http://127.0.0.1:8765/`. No internet connection, network share, cloud service, or remote backend is required.
+The application is opened directly from the local filesystem with `file://`. It does not require a server, localhost process, backend, network share, CDN, or internet connection.
 
 JavaScript, CSS, SQLite WASM, the database worker, PDF.js, and other runtime resources are embedded into that HTML file. The build fails if Vite emits a second production runtime artifact.
 
@@ -84,7 +83,7 @@ At startup the user chooses one of two actions:
 
 All case data, imported eFAST rows, extracted values, audit history, document chunks, and the imported CSV/PDF bytes themselves are stored inside that SQLite workspace. The HTML application remains one file; the workspace file is user data, not an application dependency.
 
-After closing the browser or restarting the workstation, start Ragtime the same way again—direct HTML where permitted, or `Start-Ragtime5500.cmd` on managed workstations—and choose the same workspace file.
+After closing the browser or restarting the workstation, open `ragtime5500.html` again and choose the same workspace file.
 
 ## Security invariant
 
@@ -98,7 +97,7 @@ Normal application runtime is designed for **zero outbound network communication
 - The database and PDF.js workers are embedded into the HTML.
 - PDF.js receives user-selected local bytes; it is never given an eFAST URL.
 - Imported source-document bytes are stored inside the local SQLite workspace.
-- No remote server is used. The managed-browser office package includes an optional loopback-only launcher bound to `127.0.0.1` when enterprise policy blocks `file://`.
+- No server, localhost process, or remote runtime is used.
 - CI audits that production `dist/` contains exactly one HTML file.
 
 See `docs/security.md`, `docs/architecture-decisions/002-direct-file-workspace.md`, and `docs/milestone-1-test-plan.md`.
