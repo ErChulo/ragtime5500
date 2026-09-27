@@ -207,7 +207,7 @@ function singleHtmlBundle(): Plugin {
         .replace(scriptDirective, `${scriptDirective} data:`)
         .replace(styleDirective, `${styleDirective} 'nonce-${INLINE_NONCE}'`)
         .replace('</head>', () => `<style nonce="${INLINE_NONCE}">${styleText}</style>\n  </head>`)
-        .replace('</body>', () => `<script type="module" nonce="${INLINE_NONCE}">${scriptText}</script>\n  </body>`);
+        .replace('</body>', () => `<script nonce="${INLINE_NONCE}">${scriptText}</script>\n  </body>`);
 
       for (const fileName of Object.keys(bundle)) {
         if (fileName !== htmlKey) delete bundle[fileName];
@@ -253,10 +253,17 @@ export default defineConfig({
     exclude: ['@sqlite.org/sqlite-wasm'],
   },
   build: {
-    target: 'es2020',
+    target: 'es2019',
     minify: false,
     sourcemap: false,
     cssCodeSplit: false,
     assetsInlineLimit: Number.MAX_SAFE_INTEGER,
+    rollupOptions: {
+      output: {
+        format: 'iife',
+        name: 'Ragtime5500App',
+        inlineDynamicImports: true,
+      },
+    },
   },
 });
