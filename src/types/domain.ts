@@ -63,7 +63,7 @@ export interface Extracted5500Value {
   schedule: string;
   part: string;
   locationReference: string;
-  subfield: 'BOY' | 'EOY';
+  subfield: string;
   canonicalConcept: string;
   rawValue: string;
   normalizedNumber: number;
@@ -72,4 +72,35 @@ export interface Extracted5500Value {
   extractionMethod: string;
   confidence: number;
   verificationStatus: VerificationStatus;
+}
+
+
+export interface StructuredExtractionRule {
+  extractionRuleId: number;
+  formYear: number;
+  schedule: string;
+  part: string;
+  locationReference: string;
+  canonicalConcept: string;
+  label: string;
+  labelPattern: string;
+  strategy: 'POSITIONAL_BOY_EOY';
+  minValueXRatio: number;
+  sourceAuthority: string;
+  sourceReference: string;
+  sourceUrl: string | null;
+}
+
+export interface StructuredExtractionIssue {
+  schedule: string;
+  part: string;
+  locationReference: string;
+  reason: 'LINE_NOT_FOUND' | 'AMBIGUOUS_NUMERIC_CELL' | 'UNSUPPORTED_STRATEGY';
+  sourcePage: number | null;
+  sourceText: string | null;
+}
+
+export interface StructuredExtractionResult {
+  values: Extracted5500Value[];
+  issues: StructuredExtractionIssue[];
 }
