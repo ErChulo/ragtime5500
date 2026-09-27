@@ -1,5 +1,7 @@
 # Milestone 1 test plan
 
+**Acceptance result: PASSED on 2026-09-27.** The designated target-workstation workflow completed successfully, including direct-file startup, persistence after restart, real local CSV/PDF ingestion, source-page provenance, full-workspace backup/restore into a new workspace, deterministic post-restore retrieval, and operation with the workstation disconnected from the network. Case-specific source values are intentionally not committed.
+
 ## Automated
 
 - **Schema**: migrations apply to empty SQLite and `PRAGMA foreign_key_check` returns no rows.
