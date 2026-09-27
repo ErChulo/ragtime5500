@@ -11,6 +11,7 @@ export function ReviewWizard({ refreshToken, onChanged }: { refreshToken: number
   const [step, setStep] = useState<Step>('matches');
   const [unresolved, setUnresolved] = useState(0);
   const [valueCount, setValueCount] = useState(0);
+  const [issueCount, setIssueCount] = useState(0);
   const [validationCount, setValidationCount] = useState(0);
 
   useEffect(() => {
@@ -18,14 +19,17 @@ export function ReviewWizard({ refreshToken, onChanged }: { refreshToken: number
     void Promise.all([
       db.exec<{ count: number }>("SELECT COUNT(*) AS count FROM document_match WHERE verification_status IN ('AMBIGUOUS','UNMATCHED','USER_REJECTED')"),
       db.exec<{ count: number }>('SELECT COUNT(*) AS count FROM filing_value'),
+      db.exec<{ count: number }>("SELECT COUNT(*) AS count FROM extraction_issue WHERE status='OPEN'"),
       db.exec<{ count: number }>('SELECT COUNT(*) AS count FROM filing_validation_result'),
-    ]).then(([matchRows, valueRows, validationRows]) => {
+    ]).then(([matchRows, valueRows, issueRows, validationRows]) => {
       if (!active) return;
       const pending = Number(matchRows[0]?.count ?? 0);
       const values = Number(valueRows[0]?.count ?? 0);
+      const issues = Number(issueRows[0]?.count ?? 0);
       const validations = Number(validationRows[0]?.count ?? 0);
       setUnresolved(pending);
       setValueCount(values);
+      setIssueCount(issues);
       setValidationCount(validations);
       setStep((current) => {
         if (pending > 0) return 'matches';
@@ -43,7 +47,7 @@ export function ReviewWizard({ refreshToken, onChanged }: { refreshToken: number
           <span>1</span> Matches {unresolved ? <em>{unresolved}</em> : null}
         </button>
         <button type="button" className={step === 'extract' ? 'substep active' : 'substep'} disabled={unresolved > 0} onClick={() => setStep('extract')}>
-          <span>2</span> Extract
+          <span>2</span> Extract {issueCount ? <em>{issueCount}</em> : null}
         </button>
         <button type="button" className={step === 'values' ? 'substep active' : 'substep'} disabled={!valueCount && unresolved > 0} onClick={() => setStep('values')}>
           <span>3</span> Verify values {valueCount ? <em>{valueCount}</em> : null}
