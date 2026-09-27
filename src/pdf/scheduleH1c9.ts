@@ -64,16 +64,25 @@ function extractFromLine(page: PdfPageText, line: TextLine): Extracted5500Value[
   // Schedule H Part I reports BOY in the left amount column and EOY in the
   // right amount column. Do not choose "the last two numbers" because the
   // PDF text layer may also expose hidden/template numeric strings.
-  const splitX = page.width * 0.76;
-  const boyCandidates = numeric.filter((item) => item.token.x < splitX);
-  const eoyCandidates = numeric.filter((item) => item.token.x >= splitX);
+  const byX = [...numeric].sort((a, b) => a.token.x - b.token.x);
+  let boy: { raw: string; value: number };
+  let eoy: { raw: string; value: number };
 
-  // Fail closed. Multiple surviving values in either cell are ambiguous and
-  // belong in extraction review rather than being silently inferred.
-  if (boyCandidates.length !== 1 || eoyCandidates.length !== 1) return null;
+  if (byX.length === 2) {
+    // With exactly two legitimate amount tokens, position alone identifies
+    // BOY (left) and EOY (right) without relying on a fixed page template.
+    [boy, eoy] = byX.map((item) => item.money);
+  } else {
+    const splitX = page.width * 0.76;
+    const boyCandidates = byX.filter((item) => item.token.x < splitX);
+    const eoyCandidates = byX.filter((item) => item.token.x >= splitX);
 
-  const boy = boyCandidates[0].money;
-  const eoy = eoyCandidates[0].money;
+    // Fail closed. Multiple surviving values in either cell are ambiguous and
+    // belong in extraction review rather than being silently inferred.
+    if (boyCandidates.length !== 1 || eoyCandidates.length !== 1) return null;
+    boy = boyCandidates[0].money;
+    eoy = eoyCandidates[0].money;
+  }
   const confidence = /common/i.test(line.text) && /trust/i.test(line.text) ? 0.96 : 0.88;
 
   return [
