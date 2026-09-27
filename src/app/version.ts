@@ -1,4 +1,4 @@
-export const APP_VERSION = '0.1.1-rc.4';
+export const APP_VERSION = '0.1.1-rc.5';
 export const APP_CHANNEL = 'Milestone 1 direct-file office candidate';
 
 export function versionedArtifactName(stem: string, extension: string, dated = true): string {

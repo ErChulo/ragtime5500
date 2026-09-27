@@ -61,6 +61,36 @@ async function getTargetRows(efastImportId: number): Promise<TargetRow[]> {
   );
 }
 
+async function excludeStaleNonTargetRows(
+  efastImportId: number,
+  normalizedPlanNumber: string,
+): Promise<number> {
+  const flaggedRows = await getTargetRows(efastImportId);
+  const stale = flaggedRows.filter((row) => !samePlanNumber(row.plan_number, normalizedPlanNumber));
+  if (!stale.length) return 0;
+
+  await db.transaction(stale.flatMap((row) => ([
+    {
+      sql: `UPDATE efast_import_row
+               SET classification_status='NON_TARGET',
+                   classification_reason='Automatically excluded because plan number does not match current target plan',
+                   included_for_matching=0,
+                   user_verified=1,
+                   matched_filing_id=NULL
+             WHERE import_row_id=?`,
+      bind: [row.import_row_id],
+    },
+    {
+      sql: `INSERT INTO audit_log(entity_type,entity_id,action,old_value,new_value)
+            VALUES('EFAST_IMPORT_ROW',?,'AUTO_EXCLUDE_NON_TARGET_PRE_PDF',NULL,
+                   json_object('included_for_matching',0,'target_plan_number',?,'row_plan_number',?))`,
+      bind: [row.import_row_id, normalizedPlanNumber, row.plan_number],
+    },
+  ])));
+
+  return stale.length;
+}
+
 async function repairExpectedFiling(
   context: ImportContext,
   row: TargetRow,
@@ -137,14 +167,14 @@ export async function preparePdfImport(efastImportId: number): Promise<PdfImport
   if (context.plan_id === null) problems.push('The case has no plan record.');
   if (!normalizedPlanNumber) problems.push('The case has no plan number. Set the target plan number before importing PDFs.');
 
+  if (normalizedPlanNumber) {
+    await excludeStaleNonTargetRows(efastImportId, normalizedPlanNumber);
+  }
+
   const targetRows = await getTargetRows(efastImportId);
   if (!targetRows.length) problems.push('No eFAST rows are marked for PDF matching in this import.');
 
   for (const row of targetRows) {
-    if (normalizedPlanNumber && !samePlanNumber(row.plan_number, normalizedPlanNumber)) {
-      problems.push(`Row ${row.import_row_id} has plan number ${row.plan_number ?? 'blank'}, not target plan number ${normalizedPlanNumber}.`);
-      continue;
-    }
     if (row.plan_year === null || !Number.isFinite(Number(row.plan_year))) {
       problems.push(`Row ${row.import_row_id} has no usable plan year.`);
       continue;
