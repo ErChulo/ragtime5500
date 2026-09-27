@@ -148,7 +148,7 @@ def main() -> None:
         backup.write_bytes(path.read_bytes())
         restored = sqlite3.connect(backup)
         assert restored.execute('PRAGMA integrity_check').fetchone()[0] == 'ok'
-        assert restored.execute("SELECT COUNT(*) FROM filing_value").fetchone()[0] == 2
+        assert restored.execute("SELECT COUNT(*) FROM filing_value").fetchone()[0] == 8
         restored.close()
 
     print('SCHEMA / M2 METADATA / VALIDATION / ACCEPTANCE SQL / REVISION / BACKUP TEST: PASS')
