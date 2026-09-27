@@ -2,6 +2,7 @@ import initialSql from './migrations/001_initial.sql?raw';
 import localSourceBlobsSql from './migrations/002_local_source_blobs.sql?raw';
 import caseEqualsPlanSql from './migrations/003_case_equals_plan.sql?raw';
 import efastRowReviewSql from './migrations/004_efast_row_review.sql?raw';
+import metadataExtractionSql from './migrations/005_metadata_extraction.sql?raw';
 
 export interface Migration {
   version: number;
@@ -14,4 +15,5 @@ export const migrations: Migration[] = [
   { version: 2, filename: '002_local_source_blobs.sql', sql: localSourceBlobsSql },
   { version: 3, filename: '003_case_equals_plan.sql', sql: caseEqualsPlanSql },
   { version: 4, filename: '004_efast_row_review.sql', sql: efastRowReviewSql },
+  { version: 5, filename: '005_metadata_extraction.sql', sql: metadataExtractionSql },
 ];
