@@ -10,7 +10,7 @@ import {
   saveExtractedValues,
 } from '../db/repository';
 import {
-  listMatchableRowsForImport,
+  listTargetRowsForImport,
   preparePdfImport,
   saveScopedPdfImport,
   type PdfImportPreflight,
@@ -67,11 +67,7 @@ export function PdfImportPanel({
     if (preflightError) return preflightError;
     if (!preflight) return 'PDF preflight has not completed.';
     if (preflight.problems.length) return preflight.problems.join(' ');
-    if (preflight.readyCount === 0) {
-      return preflight.alreadyMatchedCount === preflight.expectedCount && preflight.expectedCount > 0
-        ? 'All expected filings already have local PDFs.'
-        : 'No expected filing is currently available for matching.';
-    }
+    if (preflight.expectedCount === 0) return 'No expected filing is available for matching.';
     return '';
   }, [preflight, preflightError]);
 
@@ -90,8 +86,13 @@ export function PdfImportPanel({
       if (currentPreflight.problems.length) {
         throw new Error(`PDF import stopped by preflight: ${currentPreflight.problems.join(' ')}`);
       }
-      if (currentPreflight.readyCount === 0) {
+      if (currentPreflight.expectedCount === 0) {
         throw new Error('PDF import stopped: no expected filing is available for matching.');
+      }
+
+      let availableRows = await listTargetRowsForImport(efastImportId);
+      if (!availableRows.length) {
+        throw new Error('PDF import stopped: no target-plan filing rows are available in this eFAST import.');
       }
 
       for (const file of files) {
@@ -101,13 +102,12 @@ export function PdfImportPanel({
           const sourceDocumentId = await ensureSourceDocument(stored, 'pdf');
           const pages = await extractPdfPages(stored.bytes);
           const signals = inferDocumentSignals(file.name, pages);
-          const matchable = await listMatchableRowsForImport(efastImportId);
-          if (!matchable.length) {
-            throw new Error('No eligible filing remains in this eFAST import.');
-          }
-
-          const match = chooseMatch(signals, matchable);
+          const match = chooseMatch(signals, availableRows);
           const saved = await saveScopedPdfImport(sourceDocumentId, pages, match);
+
+          if (match?.status === 'AUTO_ACCEPTED') {
+            availableRows = availableRows.filter((row) => row.importRowId !== match.importRowId);
+          }
 
           let detail = `Match: ${saved.matchStatus}.`;
           if (saved.filingId !== null) {
@@ -209,7 +209,11 @@ export function PdfImportPanel({
           {working ? 'Processing locally…' : files.length ? `Import ${files.length} PDF${files.length === 1 ? '' : 's'}` : 'Select PDFs to continue'}
         </button>
         <span className="action-hint">
-          {blockedReason || (files.length ? `${files.length} local file${files.length === 1 ? '' : 's'} selected.` : 'No files selected.')}
+          {blockedReason || (files.length
+            ? `${files.length} local file${files.length === 1 ? '' : 's'} selected.`
+            : preflight?.readyCount === 0 && preflight?.expectedCount
+              ? 'All expected filings already have local PDFs; you may re-import to verify or repair their links.'
+              : 'No files selected.')}
         </span>
       </div>
 
