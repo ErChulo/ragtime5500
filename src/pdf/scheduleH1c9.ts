@@ -33,12 +33,21 @@ function isTargetLine(text: string): boolean {
   return hasReference || hasLabel;
 }
 
+function looksLikeFormPlaceholder(digits: string): boolean {
+  // IRS/DOL fillable forms may expose template/example numerals in the PDF
+  // text layer. These are not source-reported amounts and must never be saved.
+  const compact = digits.replace(/^0+/, '');
+  return compact === '123456789012345'
+    || compact === '12345678901234'
+    || /^1234567890(?:12345)?$/.test(compact);
+}
+
 function parseMoneyToken(text: string): { raw: string; value: number } | null {
   const trimmed = text.trim();
   if (!/^\$?\(?-?[\d,]+\)?$/.test(trimmed)) return null;
   const negative = trimmed.includes('(') || trimmed.includes('-');
   const digits = trimmed.replace(/[^\d]/g, '');
-  if (!digits) return null;
+  if (!digits || looksLikeFormPlaceholder(digits)) return null;
   const value = Number(digits) * (negative ? -1 : 1);
   if (!Number.isSafeInteger(value)) return null;
   return { raw: trimmed, value };
@@ -51,7 +60,20 @@ function extractFromLine(page: PdfPageText, line: TextLine): Extracted5500Value[
     .filter((item) => item.token.x > page.width * 0.45);
 
   if (numeric.length < 2) return null;
-  const [boy, eoy] = numeric.slice(-2).map((item) => item.money);
+
+  // Schedule H Part I reports BOY in the left amount column and EOY in the
+  // right amount column. Do not choose "the last two numbers" because the
+  // PDF text layer may also expose hidden/template numeric strings.
+  const splitX = page.width * 0.76;
+  const boyCandidates = numeric.filter((item) => item.token.x < splitX);
+  const eoyCandidates = numeric.filter((item) => item.token.x >= splitX);
+
+  // Fail closed. Multiple surviving values in either cell are ambiguous and
+  // belong in extraction review rather than being silently inferred.
+  if (boyCandidates.length !== 1 || eoyCandidates.length !== 1) return null;
+
+  const boy = boyCandidates[0].money;
+  const eoy = eoyCandidates[0].money;
   const confidence = /common/i.test(line.text) && /trust/i.test(line.text) ? 0.96 : 0.88;
 
   return [
