@@ -1,5 +1,5 @@
 import { db } from './client';
-import type { EfastRow, Extracted5500Value } from '../types/domain';
+import type { EfastRow, Extracted5500Value, StructuredExtractionIssue, StructuredExtractionRule } from '../types/domain';
 import type { StoredFile } from '../ingest/opfsFiles';
 import type { MatchableEfastRow } from '../matching/matchPdf';
 
@@ -935,4 +935,210 @@ export async function listSourceDocumentsForIntegrity(): Promise<Array<{
     fileSize: Number(row.file_size),
     sourceType: String(row.source_type),
   }));
+}
+
+
+export async function listStructuredExtractionRules(
+  formYear: number,
+  schedule = 'H',
+): Promise<StructuredExtractionRule[]> {
+  const rows = await db.exec<Record<string, unknown>>(
+    `SELECT r.extraction_rule_id,fd.form_year,r.schedule_name,r.part,r.location_reference,
+            MIN(ld.canonical_concept) AS canonical_concept,
+            MIN(ld.label) AS label,
+            r.label_pattern,r.strategy,r.min_value_x_ratio,
+            r.source_authority,r.source_reference,r.source_url
+       FROM line_extraction_rule r
+       JOIN form_definition fd ON fd.form_definition_id=r.form_definition_id
+       JOIN line_definition ld
+         ON ld.form_definition_id=r.form_definition_id
+        AND ld.schedule_name=r.schedule_name
+        AND ld.part=r.part
+        AND ld.location_reference=r.location_reference
+      WHERE fd.form_year=? AND r.schedule_name=? AND r.active=1
+      GROUP BY r.extraction_rule_id,fd.form_year,r.schedule_name,r.part,r.location_reference,
+               r.label_pattern,r.strategy,r.min_value_x_ratio,
+               r.source_authority,r.source_reference,r.source_url
+      ORDER BY r.part,r.location_reference`,
+    [formYear, schedule],
+  );
+
+  return rows.map((row) => ({
+    extractionRuleId: Number(row.extraction_rule_id),
+    formYear: Number(row.form_year),
+    schedule: String(row.schedule_name),
+    part: String(row.part),
+    locationReference: String(row.location_reference),
+    canonicalConcept: String(row.canonical_concept),
+    label: String(row.label),
+    labelPattern: String(row.label_pattern),
+    strategy: String(row.strategy) as StructuredExtractionRule['strategy'],
+    minValueXRatio: Number(row.min_value_x_ratio),
+    sourceAuthority: String(row.source_authority),
+    sourceReference: String(row.source_reference),
+    sourceUrl: row.source_url == null ? null : String(row.source_url),
+  }));
+}
+
+export async function listExtractionCoverage(
+  formYear?: number,
+): Promise<Array<Record<string, unknown>>> {
+  const bind: number[] = [];
+  const where = formYear == null ? '' : 'WHERE fd.form_year=?';
+  if (formYear != null) bind.push(formYear);
+  return db.exec(
+    `SELECT fd.form_year,r.schedule_name,r.part,r.location_reference,
+            MIN(ld.label) AS label,MIN(ld.canonical_concept) AS canonical_concept,
+            r.strategy,r.source_authority,r.source_reference,
+            COUNT(ld.line_definition_id) AS output_field_count
+       FROM line_extraction_rule r
+       JOIN form_definition fd ON fd.form_definition_id=r.form_definition_id
+       JOIN line_definition ld
+         ON ld.form_definition_id=r.form_definition_id
+        AND ld.schedule_name=r.schedule_name
+        AND ld.part=r.part
+        AND ld.location_reference=r.location_reference
+       ${where}
+      WHERE r.active=1 ${formYear == null ? '' : 'AND fd.form_year=?'}
+      GROUP BY fd.form_year,r.schedule_name,r.part,r.location_reference,
+               r.strategy,r.source_authority,r.source_reference
+      ORDER BY fd.form_year DESC,r.schedule_name,r.part,r.location_reference`,
+    formYear == null ? [] : [formYear],
+  );
+}
+
+export async function listMatchedFilingsForExtraction(): Promise<Array<Record<string, unknown>>> {
+  return db.exec(
+    `SELECT f.filing_id,py.year AS plan_year,sd.filename AS source_filename,
+            sd.storage_key,p.plan_name,p.plan_number,
+            COUNT(DISTINCT r.extraction_rule_id) AS rule_count
+       FROM filing f
+       JOIN plan_year py ON py.plan_year_id=f.plan_year_id
+       JOIN plan p ON p.plan_id=py.plan_id
+       JOIN source_document sd ON sd.source_document_id=f.source_document_id
+       JOIN form_definition fd ON fd.form_year=py.year
+       JOIN line_extraction_rule r ON r.form_definition_id=fd.form_definition_id AND r.active=1
+      WHERE f.source_document_id IS NOT NULL
+      GROUP BY f.filing_id,py.year,sd.filename,sd.storage_key,p.plan_name,p.plan_number
+      ORDER BY py.year DESC,f.filing_id DESC`,
+  );
+}
+
+export async function recordStructuredExtraction(
+  filingId: number,
+  ruleCount: number,
+  values: Extracted5500Value[],
+  issues: StructuredExtractionIssue[],
+): Promise<void> {
+  await db.exec(
+    `INSERT INTO audit_log(entity_type,entity_id,action,old_value,new_value)
+     VALUES('FILING',?,'STRUCTURED_EXTRACTION_RUN',NULL,
+            json_object(
+              'engine','METADATA_POSITIONAL_BOY_EOY_V1',
+              'rule_count',?,
+              'value_count',?,
+              'issue_count',?,
+              'issues_json',?
+            ))`,
+    [filingId, ruleCount, values.length, issues.length, JSON.stringify(issues)],
+  );
+}
+
+export async function validateScheduleHPartI(
+  filingId: number,
+): Promise<void> {
+  const rows = await db.exec<{
+    location_reference: string;
+    subfield: string;
+    normalized_number: number | null;
+  }>(
+    `SELECT ld.location_reference,ld.subfield,fv.normalized_number
+       FROM filing_value fv
+       JOIN line_definition ld ON ld.line_definition_id=fv.line_definition_id
+      WHERE fv.filing_id=?
+        AND ld.schedule_name='H'
+        AND ld.part='I'
+        AND ld.location_reference IN ('1F','1K','1L')`,
+    [filingId],
+  );
+
+  const byKey = new Map<string, number>();
+  for (const row of rows) {
+    if (row.normalized_number == null) continue;
+    byKey.set(`${row.location_reference}:${row.subfield}`, Number(row.normalized_number));
+  }
+
+  const statements: Array<{ sql: string; bind?: (string | number | null)[] }> = [];
+  for (const subfield of ['BOY', 'EOY']) {
+    const assets = byKey.get(`1F:${subfield}`);
+    const liabilities = byKey.get(`1K:${subfield}`);
+    const netAssets = byKey.get(`1L:${subfield}`);
+
+    let status: 'PASS' | 'FAIL' | 'NOT_EVALUATED' = 'NOT_EVALUATED';
+    let severity: 'INFO' | 'WARNING' | 'ERROR' = 'INFO';
+    let observed: number | null = netAssets ?? null;
+    let expected: number | null = null;
+    let message = `${subfield}: net-assets identity not evaluated because 1F, 1K, or 1L is missing.`;
+
+    if (assets != null && liabilities != null && netAssets != null) {
+      expected = assets - liabilities;
+      const difference = netAssets - expected;
+      status = Math.abs(difference) <= 1 ? 'PASS' : 'FAIL';
+      severity = status === 'PASS' ? 'INFO' : 'ERROR';
+      message = status === 'PASS'
+        ? `${subfield}: Schedule H Part I balances: 1L = 1F - 1K.`
+        : `${subfield}: Schedule H Part I does not balance; 1L differs from 1F - 1K by ${difference.toLocaleString()}.`;
+    }
+
+    statements.push({
+      sql: `INSERT INTO filing_validation_result(
+              filing_id,rule_code,subfield,status,severity,observed_number,expected_number,message,details_json,checked_at
+            ) VALUES(?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP)
+            ON CONFLICT(filing_id,rule_code,subfield) DO UPDATE SET
+              status=excluded.status,
+              severity=excluded.severity,
+              observed_number=excluded.observed_number,
+              expected_number=excluded.expected_number,
+              message=excluded.message,
+              details_json=excluded.details_json,
+              checked_at=CURRENT_TIMESTAMP`,
+      bind: [
+        filingId,
+        'H_PART_I_NET_ASSETS_IDENTITY',
+        subfield,
+        status,
+        severity,
+        observed,
+        expected,
+        message,
+        JSON.stringify({ assets, liabilities, netAssets }),
+      ],
+    });
+  }
+
+  await db.transaction(statements);
+}
+
+export async function listValidationResults(): Promise<Array<Record<string, unknown>>> {
+  return db.exec(
+    `SELECT vr.validation_result_id,vr.rule_code,vr.subfield,vr.status,vr.severity,
+            vr.observed_number,vr.expected_number,vr.message,vr.checked_at,
+            py.year AS plan_year,p.plan_name,p.plan_number,sd.filename AS source_filename
+       FROM filing_validation_result vr
+       JOIN filing f ON f.filing_id=vr.filing_id
+       JOIN plan_year py ON py.plan_year_id=f.plan_year_id
+       JOIN plan p ON p.plan_id=py.plan_id
+       LEFT JOIN source_document sd ON sd.source_document_id=f.source_document_id
+      ORDER BY CASE vr.status WHEN 'FAIL' THEN 0 WHEN 'NOT_EVALUATED' THEN 1 ELSE 2 END,
+               py.year DESC,vr.rule_code,vr.subfield`,
+  );
+}
+
+export async function listCanonicalConcepts(): Promise<string[]> {
+  const rows = await db.exec<{ canonical_concept: string }>(
+    `SELECT DISTINCT canonical_concept
+       FROM line_definition
+      ORDER BY canonical_concept`,
+  );
+  return rows.map((row) => row.canonical_concept);
 }
