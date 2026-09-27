@@ -23,11 +23,14 @@ export default function App() {
 
   useEffect(() => {
     db.init().then((info) => {
-      setDbInfo(`SQLite ${info.sqliteVersion} · ${info.persistence} · foreign keys ${info.foreignKeys ? 'ON' : 'OFF'}`);
+      const mode = db.runtimeMode() === 'same-page-fallback' ? ' · compatibility mode' : '';
+      setDbInfo(`SQLite ${info.sqliteVersion} · ${info.persistence} · foreign keys ${info.foreignKeys ? 'ON' : 'OFF'}${mode}`);
       setDbReady(true);
-      setWorkspaceStatus('SQLite is ready. Open or create a local workspace file.');
+      setWorkspaceStatus(`SQLite is ready${mode}. Open or create a local workspace file.`);
     }).catch((error) => {
-      setDbInfo(`Database initialization failed: ${error instanceof Error ? error.message : String(error)}`);
+      const message = `Database initialization failed: ${error instanceof Error ? error.message : String(error)}`;
+      setDbInfo(message);
+      setWorkspaceStatus(message);
       setDbReady(false);
     });
   }, []);

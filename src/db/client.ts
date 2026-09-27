@@ -119,12 +119,35 @@ export class DbClient {
     const worker = this.ensureWorker();
     const id = this.nextId++;
     return new Promise<T>((resolve, reject) => {
-      this.pending.set(id, { resolve: resolve as (value: unknown) => void, reject });
+      let settled = false;
+      const finishResolve = (value: unknown) => {
+        if (settled) return;
+        settled = true;
+        if (timer !== null) window.clearTimeout(timer);
+        resolve(value as T);
+      };
+      const finishReject = (reason?: unknown) => {
+        if (settled) return;
+        settled = true;
+        if (timer !== null) window.clearTimeout(timer);
+        reject(reason);
+      };
+      const timer = payload.type === 'init'
+        ? window.setTimeout(() => {
+            this.pending.delete(id);
+            finishReject(new Error('Database worker startup timed out; switching to same-page SQLite compatibility mode.'));
+          }, 4000)
+        : null;
+
+      this.pending.set(id, {
+        resolve: finishResolve,
+        reject: finishReject,
+      });
       try {
         worker.postMessage({ id, ...payload }, transfer);
       } catch (error) {
         this.pending.delete(id);
-        reject(error);
+        finishReject(error);
       }
     });
   }
