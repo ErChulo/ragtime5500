@@ -7,7 +7,7 @@
 ![SQLite WASM](https://img.shields.io/badge/SQLite-WASM-passing-brightgreen)
 ![Schema contracts](https://img.shields.io/badge/schema%20contracts-passing-brightgreen)
 ![Security audit](https://img.shields.io/badge/security%20audit-passing-brightgreen)
-![Manual acceptance](https://img.shields.io/badge/manual%20acceptance-candidate-blue)
+![Manual acceptance](https://img.shields.io/badge/manual%20acceptance-passed-brightgreen)
 
 **Offline Form 5500 Case Database + Local Retrieval**
 
@@ -16,11 +16,13 @@
 For the air-gapped office workstation, download the tested standalone HTML from the dedicated `office-builds` branch:
 
 - **[Download latest single-HTML build](https://github.com/ErChulo/ragtime5500/raw/office-builds/ragtime5500-latest.html)**
-- [Download versioned build v0.1.1-rc.7](https://github.com/ErChulo/ragtime5500/raw/office-builds/ragtime5500-v0.1.1-rc.7.html)
+- [Download versioned build v0.1.1](https://github.com/ErChulo/ragtime5500/raw/office-builds/ragtime5500-v0.1.1.html)
 - [SHA-256 checksums](https://github.com/ErChulo/ragtime5500/blob/office-builds/SHA256SUMS.txt)
 - [Published version](https://github.com/ErChulo/ragtime5500/blob/office-builds/VERSION.txt)
 
 The `office-builds` branch is generated only after the repository test/build/security gates pass on `main`. The downloaded HTML is the complete application and is intended to open directly from local disk with the network disconnected.
+
+**Milestone 1 was accepted on 2026-09-27 on the target workstation.** The accepted workflow covered eFAST CSV import and target-plan filtering, 16 local Form 5500 PDFs, deterministic matching, 2024 Schedule H Part I 1C9 extraction with page provenance, persistence after browser restart, full-workspace backup/restore into a new SQLite workspace, deterministic retrieval after restore, and successful operation with the workstation disconnected from the network. Case-specific source values and documents are intentionally not committed to this public repository.
 
 
 
