@@ -53,6 +53,10 @@ jobs:
           fi
           CHROME_PATH="$CHROME" node scripts/browser-file-smoke.mjs
 
+      - name: Test managed-browser office launcher
+        shell: pwsh
+        run: ./office/Start-Ragtime5500.ps1 -HtmlPath ./dist/ragtime5500.html -SelfTest
+
       - name: Record standalone artifact checksum
         run: sha256sum dist/ragtime5500.html
 
@@ -71,7 +75,7 @@ jobs:
           echo "The production Ragtime 5500 runtime remains local and air-gapped."
 
   publish-office-build:
-    name: Publish office single-HTML build
+    name: Publish office build and managed-browser package
     needs: check
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
@@ -97,9 +101,24 @@ jobs:
           mkdir -p /tmp/ragtime-publish
           cp /tmp/ragtime-build/ragtime5500.html "/tmp/ragtime-publish/ragtime5500-v${VERSION}.html"
           cp /tmp/ragtime-build/ragtime5500.html "/tmp/ragtime-publish/ragtime5500-latest.html"
+          cp office/Start-Ragtime5500.ps1 /tmp/ragtime-publish/
+          cp office/Start-Ragtime5500.cmd /tmp/ragtime-publish/
+          cp office/README-OFFICE.txt /tmp/ragtime-publish/
+
+          mkdir -p "/tmp/ragtime-office-v${VERSION}"
+          cp "/tmp/ragtime-publish/ragtime5500-v${VERSION}.html" "/tmp/ragtime-office-v${VERSION}/ragtime5500-latest.html"
+          cp /tmp/ragtime-publish/Start-Ragtime5500.ps1 "/tmp/ragtime-office-v${VERSION}/"
+          cp /tmp/ragtime-publish/Start-Ragtime5500.cmd "/tmp/ragtime-office-v${VERSION}/"
+          cp /tmp/ragtime-publish/README-OFFICE.txt "/tmp/ragtime-office-v${VERSION}/"
+          (
+            cd "/tmp/ragtime-office-v${VERSION}"
+            zip -q -9 "/tmp/ragtime-publish/ragtime5500-office-v${VERSION}.zip" *
+          )
+          cp "/tmp/ragtime-publish/ragtime5500-office-v${VERSION}.zip" "/tmp/ragtime-publish/ragtime5500-office-latest.zip"
+
           (
             cd /tmp/ragtime-publish
-            sha256sum "ragtime5500-v${VERSION}.html" "ragtime5500-latest.html" > SHA256SUMS.txt
+            sha256sum "ragtime5500-v${VERSION}.html" "ragtime5500-latest.html" "ragtime5500-office-v${VERSION}.zip" "ragtime5500-office-latest.zip" > SHA256SUMS.txt
             printf '%s\n' "${VERSION}" > VERSION.txt
           )
 
@@ -118,8 +137,13 @@ jobs:
           cp /tmp/ragtime-publish/ragtime5500-latest.html .
           cp /tmp/ragtime-publish/SHA256SUMS.txt .
           cp /tmp/ragtime-publish/VERSION.txt .
+          cp /tmp/ragtime-publish/Start-Ragtime5500.ps1 .
+          cp /tmp/ragtime-publish/Start-Ragtime5500.cmd .
+          cp /tmp/ragtime-publish/README-OFFICE.txt .
+          cp "/tmp/ragtime-publish/ragtime5500-office-v${VERSION}.zip" .
+          cp /tmp/ragtime-publish/ragtime5500-office-latest.zip .
 
-          git add "ragtime5500-v${VERSION}.html" ragtime5500-latest.html SHA256SUMS.txt VERSION.txt
+          git add "ragtime5500-v${VERSION}.html" ragtime5500-latest.html SHA256SUMS.txt VERSION.txt Start-Ragtime5500.ps1 Start-Ragtime5500.cmd README-OFFICE.txt "ragtime5500-office-v${VERSION}.zip" ragtime5500-office-latest.zip
           if git diff --cached --quiet; then
             echo "Office build already published."
             exit 0
