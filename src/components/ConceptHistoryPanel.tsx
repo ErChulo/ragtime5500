@@ -13,7 +13,7 @@ function addYearOverYear(rows: Array<Record<string, unknown>>): Array<Record<str
   });
 
   const prior = new Map<string, { year: number; value: number }>();
-  return sorted.map((row) => {
+  const decorated: Array<Record<string, unknown>> = sorted.map((row): Record<string, unknown> => {
     const value = row.normalized_number == null ? null : Number(row.normalized_number);
     const year = Number(row.plan_year ?? 0);
     const key = `${String(row.plan_number ?? row.plan_name ?? '')}|${String(row.subfield ?? '')}`;
@@ -35,7 +35,9 @@ function addYearOverYear(rows: Array<Record<string, unknown>>): Array<Record<str
       year_over_year_change: delta,
       year_over_year_change_pct: deltaPct,
     };
-  }).sort((a, b) => {
+  });
+
+  return decorated.sort((a, b) => {
     const plan = String(a.plan_name ?? '').localeCompare(String(b.plan_name ?? ''));
     if (plan) return plan;
     return Number(b.plan_year ?? 0) - Number(a.plan_year ?? 0)
