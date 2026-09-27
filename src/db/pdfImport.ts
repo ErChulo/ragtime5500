@@ -69,16 +69,24 @@ async function excludeStaleNonTargetRows(
   const stale = flaggedRows.filter((row) => !samePlanNumber(row.plan_number, normalizedPlanNumber));
   if (!stale.length) return 0;
 
-  await db.transaction(stale.map((row) => ({
-    sql: `UPDATE efast_import_row
-             SET classification_status='NON_TARGET',
-                 classification_reason='Automatically excluded because plan number does not match current target plan',
-                 included_for_matching=0,
-                 user_verified=1,
-                 matched_filing_id=NULL
-           WHERE import_row_id=?`,
-    bind: [row.import_row_id],
-  })));
+  await db.transaction(stale.flatMap((row) => ([
+    {
+      sql: `UPDATE efast_import_row
+               SET classification_status='NON_TARGET',
+                   classification_reason='Automatically excluded because plan number does not match current target plan',
+                   included_for_matching=0,
+                   user_verified=1,
+                   matched_filing_id=NULL
+             WHERE import_row_id=?`,
+      bind: [row.import_row_id],
+    },
+    {
+      sql: `INSERT INTO audit_log(entity_type,entity_id,action,old_value,new_value)
+            VALUES('EFAST_IMPORT_ROW',?,'AUTO_EXCLUDE_NON_TARGET_PRE_PDF',NULL,
+                   json_object('included_for_matching',0,'target_plan_number',?,'row_plan_number',?))`,
+      bind: [row.import_row_id, normalizedPlanNumber, row.plan_number],
+    },
+  ])));
 
   return stale.length;
 }
