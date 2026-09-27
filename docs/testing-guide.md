@@ -1,3 +1,5 @@
+> **Milestone 2 note:** This document remains the accepted Milestone 1 test drive. For v0.2.0-rc.1 metadata-driven extraction acceptance, use [milestone-2-test-plan.md](milestone-2-test-plan.md). The Milestone 1 workflow remains a regression requirement.
+
 # Ragtime 5500 — Manual Test Drive
 
 This guide is written for a first-time tester. Do one step at a time. Do not move forward until the expected result appears.
