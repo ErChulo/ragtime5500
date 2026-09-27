@@ -1,6 +1,6 @@
 import dbWorkerUrl from './worker?worker&url';
+import { LocalDbRuntime, type BindValue, type DbRequest } from './runtime';
 
-type BindValue = string | number | bigint | null | Uint8Array;
 export type SqlBind = BindValue[] | Record<string, BindValue>;
 
 export interface DbDiagnostics {
@@ -72,34 +72,75 @@ function looksReadOnly(sql: string): boolean {
 }
 
 export class DbClient {
-  private readonly worker: Worker;
+  private worker: Worker | null = null;
+  private fallback: LocalDbRuntime | null = null;
+  private workerUnavailableReason: string | null = null;
   private nextId = 1;
   private readonly pending = new Map<number, Pending>();
   private workspaceHandle: WorkspaceFileHandle | null = null;
   private persistChain: Promise<void> = Promise.resolve();
 
-  constructor() {
-    this.worker = workerFromBundledUrl(dbWorkerUrl);
-    this.worker.onmessage = (event: MessageEvent<WorkerResponse>) => {
-      const response = event.data;
-      const pending = this.pending.get(response.id);
-      if (!pending) return;
-      this.pending.delete(response.id);
-      if (response.ok) pending.resolve(response.result);
-      else pending.reject(new Error(response.error));
-    };
-    this.worker.onerror = (event) => {
-      for (const pending of this.pending.values()) pending.reject(event.error ?? new Error(event.message));
-      this.pending.clear();
-    };
+  private ensureWorker(): Worker {
+    if (this.worker) return this.worker;
+    if (this.workerUnavailableReason) throw new Error(this.workerUnavailableReason);
+
+    try {
+      const worker = workerFromBundledUrl(dbWorkerUrl);
+      worker.onmessage = (event: MessageEvent<WorkerResponse>) => {
+        const response = event.data;
+        const pending = this.pending.get(response.id);
+        if (!pending) return;
+        this.pending.delete(response.id);
+        if (response.ok) pending.resolve(response.result);
+        else pending.reject(new Error(response.error));
+      };
+      worker.onerror = (event) => {
+        const reason = event.error ?? new Error(event.message || 'Database worker failed to start.');
+        this.workerUnavailableReason = reason instanceof Error ? reason.message : String(reason);
+        for (const pending of this.pending.values()) pending.reject(reason);
+        this.pending.clear();
+        try { worker.terminate(); } catch {}
+        this.worker = null;
+      };
+      this.worker = worker;
+      return worker;
+    } catch (error) {
+      this.workerUnavailableReason = error instanceof Error ? error.message : String(error);
+      throw error;
+    }
   }
 
-  private request<T>(payload: Record<string, unknown>, transfer: Transferable[] = []): Promise<T> {
+  private async fallbackRequest<T>(payload: DbRequest): Promise<T> {
+    if (!this.fallback) this.fallback = new LocalDbRuntime();
+    return this.fallback.handle(payload) as Promise<T>;
+  }
+
+  private workerRequest<T>(payload: DbRequest, transfer: Transferable[] = []): Promise<T> {
+    const worker = this.ensureWorker();
     const id = this.nextId++;
     return new Promise<T>((resolve, reject) => {
       this.pending.set(id, { resolve: resolve as (value: unknown) => void, reject });
-      this.worker.postMessage({ id, ...payload }, transfer);
+      try {
+        worker.postMessage({ id, ...payload }, transfer);
+      } catch (error) {
+        this.pending.delete(id);
+        reject(error);
+      }
     });
+  }
+
+  private async request<T>(payload: DbRequest, transfer: Transferable[] = []): Promise<T> {
+    if (this.fallback) return this.fallbackRequest<T>(payload);
+
+    try {
+      return await this.workerRequest<T>(payload, transfer);
+    } catch (workerError) {
+      if (payload.type !== 'init') throw workerError;
+      this.workerUnavailableReason = workerError instanceof Error ? workerError.message : String(workerError);
+      try { this.worker?.terminate(); } catch {}
+      this.worker = null;
+      return this.fallbackRequest<T>(payload);
+    }
   }
 
   private requireWorkspace(): WorkspaceFileHandle {
@@ -127,6 +168,12 @@ export class DbClient {
     return this.request({ type: 'init' });
   }
 
+  runtimeMode(): 'worker' | 'same-page-fallback' | 'not-started' {
+    if (this.fallback) return 'same-page-fallback';
+    if (this.worker) return 'worker';
+    return 'not-started';
+  }
+
   supportsWorkspaceFiles(): boolean {
     const pickerWindow = window as FilePickerWindow;
     return typeof pickerWindow.showOpenFilePicker === 'function' && typeof pickerWindow.showSaveFilePicker === 'function';
@@ -143,7 +190,7 @@ export class DbClient {
   async createWorkspace(suggestedName = 'ragtime5500-workspace.sqlite3'): Promise<string> {
     const pickerWindow = window as FilePickerWindow;
     if (typeof pickerWindow.showSaveFilePicker !== 'function') {
-      throw new Error('This Chrome installation does not expose the local file workspace API required by the standalone app.');
+      throw new Error('This browser does not expose the local file workspace API required by the standalone app.');
     }
 
     const handle = await pickerWindow.showSaveFilePicker({
@@ -162,7 +209,7 @@ export class DbClient {
   async openWorkspace(): Promise<string> {
     const pickerWindow = window as FilePickerWindow;
     if (typeof pickerWindow.showOpenFilePicker !== 'function') {
-      throw new Error('This Chrome installation does not expose the local file workspace API required by the standalone app.');
+      throw new Error('This browser does not expose the local file workspace API required by the standalone app.');
     }
 
     const handles = await pickerWindow.showOpenFilePicker({
