@@ -253,7 +253,7 @@ export default defineConfig({
     exclude: ['@sqlite.org/sqlite-wasm'],
   },
   build: {
-    target: 'es2022',
+    target: 'es2020',
     minify: false,
     sourcemap: false,
     cssCodeSplit: false,
