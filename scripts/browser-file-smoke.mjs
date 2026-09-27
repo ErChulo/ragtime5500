@@ -122,7 +122,7 @@ class CdpClient {
   }
 }
 
-async function startBrowser(forceWorkerFailure = false) {
+async function startBrowser() {
   const process = spawn(chrome, [
     '--headless=new',
     '--no-sandbox',
@@ -171,21 +171,6 @@ async function startBrowser(forceWorkerFailure = false) {
   await cdp.send('Network.enable');
   await cdp.send('Page.enable');
   await cdp.send('Runtime.enable');
-  if (forceWorkerFailure) {
-    await cdp.send('Page.addScriptToEvaluateOnNewDocument', {
-      source: `
-        Object.defineProperty(globalThis, 'Worker', {
-          configurable: true,
-          writable: true,
-          value: class BlockedWorker {
-            constructor() {
-              throw new Error('Worker blocked by simulated managed-browser policy');
-            }
-          }
-        });
-      `,
-    });
-  }
   await cdp.send('Page.navigate', { url: appUrl });
 
   return { process, cdp, stderr: () => stderr };
@@ -243,8 +228,24 @@ try {
 
   process.stdout.write('FILE-BROWSER SMOKE: PASS — direct file startup, SQLite WASM, workspace-file APIs, hash route, and zero outbound HTTP(S).\\n');
 
-  await stopBrowser(browser);
-  browser = await startBrowser(true);
+  await browser.cdp.send('Page.addScriptToEvaluateOnNewDocument', {
+    source: `
+      Object.defineProperty(globalThis, 'Worker', {
+        configurable: true,
+        writable: true,
+        value: class BlockedWorker {
+          constructor() {
+            throw new Error('Worker blocked by simulated managed-browser policy');
+          }
+        }
+      });
+    `,
+  });
+  browser.cdp.httpRequests.length = 0;
+  browser.cdp.messages.length = 0;
+  await browser.cdp.send('Page.navigate', { url: 'about:blank' });
+  await waitFor(browser.cdp, `location.href === 'about:blank'`, 'blank page before Worker fallback test');
+  await browser.cdp.send('Page.navigate', { url: appUrl });
 
   await waitFor(
     browser.cdp,
