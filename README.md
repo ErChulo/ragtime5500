@@ -16,7 +16,7 @@
 For the air-gapped office workstation, download the tested standalone HTML from the dedicated `office-builds` branch:
 
 - **[Download latest single-HTML build](https://github.com/ErChulo/ragtime5500/raw/office-builds/ragtime5500-latest.html)**
-- [Download versioned build v0.1.1-rc.6](https://github.com/ErChulo/ragtime5500/raw/office-builds/ragtime5500-v0.1.1-rc.6.html)
+- [Download versioned build v0.1.1-rc.7](https://github.com/ErChulo/ragtime5500/raw/office-builds/ragtime5500-v0.1.1-rc.7.html)
 - [SHA-256 checksums](https://github.com/ErChulo/ragtime5500/blob/office-builds/SHA256SUMS.txt)
 - [Published version](https://github.com/ErChulo/ragtime5500/blob/office-builds/VERSION.txt)
 
