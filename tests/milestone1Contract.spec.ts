@@ -10,9 +10,9 @@ describe('Milestone 1 release contract', () => {
   it('keeps the package version and visible app version synchronized', () => {
     const pkg = JSON.parse(source('package.json')) as { version: string };
     const version = source('src/app/version.ts');
-    expect(pkg.version).toBe('0.1.1-rc.2');
-    expect(version).toContain("APP_VERSION = '0.1.1-rc.2'");
-    expect(version).toContain("APP_CHANNEL = 'Milestone 1 office compatibility candidate'");
+    expect(pkg.version).toBe('0.1.1-rc.3');
+    expect(version).toContain("APP_VERSION = '0.1.1-rc.3'");
+    expect(version).toContain("APP_CHANNEL = 'Milestone 1 managed-browser office candidate'");
   });
 
   it('enforces connect-src none in the application CSP', () => {
@@ -163,6 +163,26 @@ describe('Milestone 1 release contract', () => {
     for (const version of [1, 2, 3, 4]) {
       expect(migrations).toContain(`version: ${version}`);
     }
+  });
+
+  it('includes a loopback-only office launcher for managed browsers that block file URLs', () => {
+    const launcher = source('office/Start-Ragtime5500.ps1');
+    expect(launcher).toContain('[System.Net.IPAddress]::Loopback');
+    expect(launcher).toContain('127.0.0.1');
+    expect(launcher).toContain('OFFICE LAUNCHER SELF-TEST: PASS');
+    expect(source('office/Start-Ragtime5500.cmd')).toContain('Start-Ragtime5500.ps1');
+  });
+
+  it('tests the office launcher during CI', () => {
+    const ci = source('.github/workflows/ci.yml');
+    expect(ci).toContain('Test managed-browser office launcher');
+    expect(ci).toContain('-SelfTest');
+  });
+
+  it('publishes a downloadable managed-browser office ZIP', () => {
+    const ci = source('.github/workflows/ci.yml');
+    expect(ci).toContain('ragtime5500-office-v${VERSION}.zip');
+    expect(ci).toContain('ragtime5500-office-latest.zip');
   });
 
   it('publishes office builds only after the check job succeeds', () => {
