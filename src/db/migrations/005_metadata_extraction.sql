@@ -20,6 +20,25 @@ CREATE TABLE line_extraction_rule (
 CREATE INDEX idx_extraction_rule_lookup
   ON line_extraction_rule(form_definition_id, schedule_name, part, location_reference, active);
 
+CREATE TABLE extraction_issue (
+  extraction_issue_id INTEGER PRIMARY KEY,
+  filing_id INTEGER NOT NULL REFERENCES filing(filing_id) ON DELETE CASCADE,
+  schedule_name TEXT NOT NULL,
+  part TEXT NOT NULL,
+  location_reference TEXT NOT NULL,
+  issue_code TEXT NOT NULL CHECK(issue_code IN ('LINE_NOT_FOUND','AMBIGUOUS_NUMERIC_CELL','UNSUPPORTED_STRATEGY')),
+  source_page INTEGER CHECK(source_page IS NULL OR source_page > 0),
+  source_text TEXT,
+  status TEXT NOT NULL DEFAULT 'OPEN'
+    CHECK(status IN ('OPEN','USER_REVIEWED','RESOLVED_BY_REEXTRACTION')),
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(filing_id, schedule_name, part, location_reference, issue_code)
+);
+
+CREATE INDEX idx_extraction_issue_queue
+  ON extraction_issue(status, filing_id, schedule_name, location_reference);
+
 CREATE TABLE filing_validation_result (
   validation_result_id INTEGER PRIMARY KEY,
   filing_id INTEGER NOT NULL REFERENCES filing(filing_id) ON DELETE CASCADE,
