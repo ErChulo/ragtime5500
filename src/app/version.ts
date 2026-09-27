@@ -1,4 +1,4 @@
-export const APP_VERSION = '0.1.1-rc.1';
+export const APP_VERSION = '0.1.1-rc.2';
 export const APP_CHANNEL = 'Milestone 1 acceptance candidate';
 
 export function versionedArtifactName(stem: string, extension: string, dated = true): string {

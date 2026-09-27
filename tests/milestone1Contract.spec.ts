@@ -10,8 +10,8 @@ describe('Milestone 1 release contract', () => {
   it('keeps the package version and visible app version synchronized', () => {
     const pkg = JSON.parse(source('package.json')) as { version: string };
     const version = source('src/app/version.ts');
-    expect(pkg.version).toBe('0.1.1-rc.1');
-    expect(version).toContain("APP_VERSION = '0.1.1-rc.1'");
+    expect(pkg.version).toBe('0.1.1-rc.2');
+    expect(version).toContain("APP_VERSION = '0.1.1-rc.2'");
     expect(version).toContain("APP_CHANNEL = 'Milestone 1 acceptance candidate'");
   });
 
@@ -37,6 +37,21 @@ describe('Milestone 1 release contract', () => {
     expect(smoke).toContain('pathToFileURL(htmlPath)');
     expect(smoke).toContain('Network.requestWillBeSent');
     expect(smoke).toContain('Outbound HTTP(S) request detected');
+  });
+
+  it('falls back to same-page SQLite when Worker startup is blocked', () => {
+    const client = source('src/db/client.ts');
+    const smoke = source('scripts/browser-file-smoke.mjs');
+    expect(client).toContain('same-page-fallback');
+    expect(client).toContain('LocalDbRuntime');
+    expect(smoke).toContain('Worker blocked by simulated managed-browser policy');
+    expect(smoke).toContain('WORKER-BLOCKED SMOKE: PASS');
+  });
+
+  it('renders a visible startup shell before React initializes', () => {
+    const html = source('index.html');
+    expect(html).toContain('Starting the offline application locally');
+    expect(html).toContain('this browser blocked the application runtime');
   });
 
   it('requires local file picker APIs for workspace persistence', () => {
