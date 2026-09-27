@@ -1,5 +1,10 @@
 import { useEffect, useState } from 'react';
-import { listExtractionCoverage, listMatchedFilingsForExtraction } from '../db/repository';
+import {
+  listExtractionCoverage,
+  listExtractionIssues,
+  listMatchedFilingsForExtraction,
+  markExtractionIssueReviewed,
+} from '../db/repository';
 import { readStoredFile } from '../ingest/opfsFiles';
 import { extractPdfPages } from '../pdf/extractText';
 import { runStructuredExtraction } from '../pdf/runStructuredExtraction';
@@ -14,20 +19,24 @@ export function StructuredExtractionPanel({
 }) {
   const [filings, setFilings] = useState<Array<Record<string, unknown>>>([]);
   const [coverage, setCoverage] = useState<Array<Record<string, unknown>>>([]);
+  const [issues, setIssues] = useState<Array<Record<string, unknown>>>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
+  const [reviewingIssueId, setReviewingIssueId] = useState<number | null>(null);
   const [status, setStatus] = useState('');
 
   const load = async () => {
     setLoading(true);
     try {
-      const [nextFilings, nextCoverage] = await Promise.all([
+      const [nextFilings, nextCoverage, nextIssues] = await Promise.all([
         listMatchedFilingsForExtraction(),
         listExtractionCoverage(),
+        listExtractionIssues(),
       ]);
       setFilings(nextFilings);
       setCoverage(nextCoverage);
+      setIssues(nextIssues);
       setSelectedId((current) => {
         if (current !== null && nextFilings.some((row) => Number(row.filing_id) === current)) return current;
         return nextFilings[0] ? Number(nextFilings[0].filing_id) : null;
@@ -65,6 +74,21 @@ export function StructuredExtractionPanel({
     }
   };
 
+  const reviewIssue = async (issueId: number) => {
+    setReviewingIssueId(issueId);
+    setStatus('');
+    try {
+      await markExtractionIssueReviewed(issueId);
+      setStatus('Extraction issue marked reviewed. No source value was invented or changed.');
+      await load();
+      onChanged();
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : String(error));
+    } finally {
+      setReviewingIssueId(null);
+    }
+  };
+
   const outputFields = coverage.reduce((sum, row) => sum + Number(row.output_field_count ?? 0), 0);
 
   return (
@@ -74,7 +98,7 @@ export function StructuredExtractionPanel({
           <p className="eyebrow">Metadata-driven extraction</p>
           <h2>Structured extraction</h2>
           <p className="panel-description">
-            Re-run supported Form 5500 extraction against an already stored local PDF. Definitions come from SQLite metadata; ambiguous cells are left for review rather than inferred.
+            Re-run supported Form 5500 extraction against an already stored local PDF. Definitions come from SQLite metadata; ambiguous or unlocatable lines enter an explicit review queue rather than being inferred.
           </p>
         </div>
       </div>
@@ -82,7 +106,7 @@ export function StructuredExtractionPanel({
       <ProcessStatus
         active={loading}
         label="Loading extraction coverage"
-        detail="Reading supported form definitions and matched local filings from SQLite."
+        detail="Reading supported form definitions, matched local filings, and open extraction issues from SQLite."
         eta="usually under 2 seconds"
       />
 
@@ -90,6 +114,7 @@ export function StructuredExtractionPanel({
         <div><span>Supported line rules</span><strong>{coverage.length}</strong></div>
         <div><span>Output fields</span><strong>{outputFields}</strong></div>
         <div><span>Matched filings available</span><strong>{filings.length}</strong></div>
+        <div><span>Open review items</span><strong>{issues.length}</strong></div>
       </div>
 
       {filings.length ? (
@@ -115,11 +140,55 @@ export function StructuredExtractionPanel({
       <ProcessStatus
         active={working}
         label="Extracting structured values locally"
-        detail="Reading the stored PDF, applying metadata definitions, saving provenance, and running deterministic validation."
+        detail="Reading the stored PDF, applying metadata definitions, saving provenance, updating the review queue, and running deterministic validation."
         eta="large PDFs may take several seconds"
       />
 
       {status ? <p className="status" role="status">{status}</p> : null}
+
+      {issues.length ? (
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Year</th><th>Source</th><th>Location</th><th>Issue</th><th>Page</th><th>Source text</th><th>Review</th></tr>
+            </thead>
+            <tbody>
+              {issues.map((row) => {
+                const issueId = Number(row.extraction_issue_id);
+                return (
+                  <tr key={String(issueId)}>
+                    <td>{String(row.plan_year)}</td>
+                    <td>{String(row.source_filename ?? '')}</td>
+                    <td className="mono">{String(row.schedule_name)} / {String(row.part)} / {String(row.location_reference)}</td>
+                    <td><span className="data-badge">{String(row.issue_code)}</span></td>
+                    <td>{row.source_page == null ? '—' : String(row.source_page)}</td>
+                    <td className="source-text">{String(row.source_text ?? 'No matching source line found.')}</td>
+                    <td>
+                      <button
+                        type="button"
+                        className="button-secondary"
+                        disabled={reviewingIssueId !== null || working}
+                        onClick={() => void reviewIssue(issueId)}
+                      >
+                        {reviewingIssueId === issueId ? 'Saving…' : 'Mark reviewed'}
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        !loading ? <div className="empty-state">No open extraction review items.</div> : null
+      )}
+
+      <ProcessStatus
+        active={reviewingIssueId !== null}
+        label="Saving extraction issue review"
+        detail="Recording the user review in SQLite without changing any extracted source value."
+        eta="usually under 2 seconds"
+      />
 
       <details>
         <summary>Supported extraction definitions</summary>
