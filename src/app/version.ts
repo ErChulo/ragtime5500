@@ -1,5 +1,5 @@
-export const APP_VERSION = '0.1.1-rc.3';
-export const APP_CHANNEL = 'Milestone 1 managed-browser office candidate';
+export const APP_VERSION = '0.1.1-rc.4';
+export const APP_CHANNEL = 'Milestone 1 direct-file office candidate';
 
 export function versionedArtifactName(stem: string, extension: string, dated = true): string {
   const date = dated ? `-${new Date().toISOString().slice(0, 10)}` : '';

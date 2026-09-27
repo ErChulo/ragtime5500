@@ -27,15 +27,16 @@ if (relativeFiles.length !== 1 || relativeFiles[0] !== TARGET) {
 const html = await readFile(join(DIST, TARGET), 'utf8');
 const shell = html
   .replace(/<style\b[^>]*>[\s\S]*?<\/style>/i, '<style></style>')
-  .replace(/<script\b[^>]*\btype=["']module["'][^>]*>[\s\S]*?<\/script>/i, '<script type="module"></script>');
+  .replace(/<script\b[^>]*>[\s\S]*?<\/script>/i, '<script></script>');
 
 const stylePattern = new RegExp(`<style\\b[^>]*\\bnonce=["']${NONCE}["'][^>]*>[\\s\\S]+<\\/style>`, 'i');
 const danglingWorkerPattern = /new URL\(["'][^"']+\.(?:js|mjs|wasm|css)["']\s*,\s*import\.meta\.url\)/i;
 
-const scriptPattern = new RegExp(`<script\\b[^>]*\\btype=["']module["'][^>]*\\bnonce=["']${NONCE}["'][^>]*>[\\s\\S]+<\\/script>`, 'i');
+const scriptPattern = new RegExp(`<script\\b(?![^>]*\\btype=["']module["'])[^>]*\\bnonce=["']${NONCE}["'][^>]*>[\\s\\S]+<\\/script>`, 'i');
 
 if (!stylePattern.test(html)) violations.push('compiled CSS is not inlined with the required CSP nonce');
-if (!scriptPattern.test(html)) violations.push('compiled JavaScript is not inlined with the required CSP nonce');
+if (!scriptPattern.test(html)) violations.push('compiled JavaScript is not inlined as a classic script with the required CSP nonce');
+if (/<script\\b[^>]*\\btype=["']module["']/i.test(html)) violations.push('compiled HTML still contains a module script');
 const danglingMatch = html.match(danglingWorkerPattern);
 if (danglingMatch) violations.push(`compiled JavaScript still contains a relative runtime asset URL: ${danglingMatch[0]}`);
 if (/<script\b[^>]*\bsrc\s*=/i.test(shell)) violations.push('HTML shell still references an external script asset');

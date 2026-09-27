@@ -155,6 +155,13 @@ export class DbClient {
   private async request<T>(payload: DbRequest, transfer: Transferable[] = []): Promise<T> {
     if (this.fallback) return this.fallbackRequest<T>(payload);
 
+    // Direct file deployment is the office contract. Avoid Worker entirely on
+    // file:// because enterprise Chromium/Edge policies commonly restrict
+    // blob/data workers even when the HTML itself is allowed.
+    if (typeof location !== 'undefined' && location.protocol === 'file:') {
+      return this.fallbackRequest<T>(payload);
+    }
+
     try {
       return await this.workerRequest<T>(payload, transfer);
     } catch (workerError) {
