@@ -12,7 +12,7 @@ describe('Milestone 1 release contract', () => {
     const version = source('src/app/version.ts');
     expect(pkg.version).toBe('0.1.1-rc.2');
     expect(version).toContain("APP_VERSION = '0.1.1-rc.2'");
-    expect(version).toContain("APP_CHANNEL = 'Milestone 1 acceptance candidate'");
+    expect(version).toContain("APP_CHANNEL = 'Milestone 1 office compatibility candidate'");
   });
 
   it('enforces connect-src none in the application CSP', () => {
@@ -52,6 +52,23 @@ describe('Milestone 1 release contract', () => {
     const html = source('index.html');
     expect(html).toContain('Starting the offline application locally');
     expect(html).toContain('this browser blocked the application runtime');
+  });
+
+  it('falls back when a database worker silently hangs during startup', () => {
+    const client = source('src/db/client.ts');
+    expect(client).toContain('Database worker startup timed out');
+    expect(client).toContain('same-page SQLite compatibility mode');
+    expect(client).toContain('window.setTimeout');
+  });
+
+  it('shows startup failures in the standalone HTML instead of remaining blank', () => {
+    const html = source('index.html');
+    expect(html).toContain('Ragtime 5500 could not start');
+    expect(html).toContain("window.addEventListener('unhandledrejection'");
+  });
+
+  it('targets ES2020 for broader enterprise Chromium/Edge compatibility', () => {
+    expect(source('vite.config.ts')).toContain("target: 'es2020'");
   });
 
   it('requires local file picker APIs for workspace persistence', () => {
