@@ -221,7 +221,7 @@ export async function preparePdfImport(efastImportId: number): Promise<PdfImport
   };
 }
 
-export async function listMatchableRowsForImport(efastImportId: number): Promise<MatchableEfastRow[]> {
+export async function listTargetRowsForImport(efastImportId: number): Promise<MatchableEfastRow[]> {
   const rows = await db.exec<Record<string, unknown>>(
     `SELECT er.import_row_id,er.plan_number,er.plan_name,er.plan_year,er.date_received,
             er.source_url,f.efast_filing_id,p.sponsor_ein
@@ -232,7 +232,6 @@ export async function listMatchableRowsForImport(efastImportId: number): Promise
        LEFT JOIN plan p ON p.plan_id=py.plan_id
       WHERE er.efast_import_id=?
         AND er.included_for_matching=1
-        AND (f.source_document_id IS NULL OR f.filing_id IS NULL)
       ORDER BY er.plan_year,er.row_number`,
     [efastImportId],
   );
@@ -303,6 +302,18 @@ export async function saveScopedPdfImport(
   });
 
   if (match.status === 'AUTO_ACCEPTED') {
+    statements.push({
+      sql: `INSERT INTO audit_log(entity_type,entity_id,action,old_value,new_value)
+            SELECT 'FILING',f.filing_id,'AUTO_RELINK_SOURCE_DOCUMENT',
+                   json_object('source_document_id',f.source_document_id),
+                   json_object('source_document_id',?)
+              FROM filing f
+             WHERE f.filing_id=(
+               SELECT matched_filing_id FROM efast_import_row WHERE import_row_id=?
+             )
+               AND f.source_document_id IS NOT ?`,
+      bind: [sourceDocumentId, match.importRowId, sourceDocumentId],
+    });
     statements.push({
       sql: `UPDATE filing
                 SET source_document_id=?,filing_status='MATCHED'
