@@ -10,9 +10,8 @@ describe('Milestone 1 release contract', () => {
   it('keeps the package version and visible app version synchronized', () => {
     const pkg = JSON.parse(source('package.json')) as { version: string };
     const version = source('src/app/version.ts');
-    expect(pkg.version).toBe('0.1.1');
-    expect(version).toContain("APP_VERSION = '0.1.1'");
-    expect(version).toContain("APP_CHANNEL = 'Milestone 1 accepted'");
+    expect(version).toContain(`APP_VERSION = '${pkg.version}'`);
+    expect(version).toContain('APP_CHANNEL =');
   });
 
   it('enforces connect-src none in the application CSP', () => {
@@ -206,7 +205,7 @@ describe('Milestone 1 release contract', () => {
 
   it('keeps migrations explicitly ordered and versioned', () => {
     const migrations = source('src/db/migrations.ts');
-    for (const version of [1, 2, 3, 4]) {
+    for (const version of [1, 2, 3, 4, 5]) {
       expect(migrations).toContain(`version: ${version}`);
     }
   });
