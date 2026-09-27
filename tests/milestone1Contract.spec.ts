@@ -10,8 +10,8 @@ describe('Milestone 1 release contract', () => {
   it('keeps the package version and visible app version synchronized', () => {
     const pkg = JSON.parse(source('package.json')) as { version: string };
     const version = source('src/app/version.ts');
-    expect(pkg.version).toBe('0.1.1-rc.5');
-    expect(version).toContain("APP_VERSION = '0.1.1-rc.5'");
+    expect(pkg.version).toBe('0.1.1-rc.6');
+    expect(version).toContain("APP_VERSION = '0.1.1-rc.6'");
     expect(version).toContain("APP_CHANNEL = 'Milestone 1 direct-file office candidate'");
   });
 
@@ -116,6 +116,31 @@ describe('Milestone 1 release contract', () => {
     expect(pdfImport).toContain("classification_status='NON_TARGET'");
     expect(pdfImport).toContain('AUTO_EXCLUDE_NON_TARGET_PRE_PDF');
     expect(pdfImport).not.toContain('not target plan number');
+  });
+
+  it('uses one stable target-row snapshot for the entire PDF batch', () => {
+    const panel = source('src/components/PdfImportPanel.tsx');
+    expect(panel).toContain('let availableRows = await listTargetRowsForImport(efastImportId)');
+    expect(panel).toContain('chooseMatch(signals, availableRows)');
+    expect(panel).toContain('availableRows = availableRows.filter');
+    expect(panel).not.toContain('No eligible filing remains in this eFAST import');
+  });
+
+  it('allows deliberate re-import even when all expected filings already have PDFs', () => {
+    const panel = source('src/components/PdfImportPanel.tsx');
+    expect(panel).toContain("preflight.expectedCount === 0");
+    expect(panel).toContain('you may re-import to verify or repair their links');
+    expect(panel).not.toContain("currentPreflight.readyCount === 0");
+  });
+
+  it('includes already-linked target rows in the batch matching snapshot', () => {
+    const pdfImport = source('src/db/pdfImport.ts');
+    expect(pdfImport).toContain('listTargetRowsForImport');
+    expect(pdfImport).not.toContain('AND (f.source_document_id IS NULL OR f.filing_id IS NULL)');
+  });
+
+  it('audits automatic source-document relinking during deterministic re-import', () => {
+    expect(source('src/db/pdfImport.ts')).toContain('AUTO_RELINK_SOURCE_DOCUMENT');
   });
 
   it('scopes PDF matching to the selected eFAST import', () => {
