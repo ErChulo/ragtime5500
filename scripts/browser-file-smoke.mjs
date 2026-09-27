@@ -122,7 +122,7 @@ class CdpClient {
   }
 }
 
-async function startBrowser() {
+async function startBrowser(forceWorkerFailure = false) {
   const process = spawn(chrome, [
     '--headless=new',
     '--no-sandbox',
@@ -171,6 +171,21 @@ async function startBrowser() {
   await cdp.send('Network.enable');
   await cdp.send('Page.enable');
   await cdp.send('Runtime.enable');
+  if (forceWorkerFailure) {
+    await cdp.send('Page.addScriptToEvaluateOnNewDocument', {
+      source: `
+        Object.defineProperty(globalThis, 'Worker', {
+          configurable: true,
+          writable: true,
+          value: class BlockedWorker {
+            constructor() {
+              throw new Error('Worker blocked by simulated managed-browser policy');
+            }
+          }
+        });
+      `,
+    });
+  }
   await cdp.send('Page.navigate', { url: appUrl });
 
   return { process, cdp, stderr: () => stderr };
@@ -226,7 +241,22 @@ try {
     throw new Error(`Outbound HTTP(S) request detected: ${browser.cdp.httpRequests.join(', ')}`);
   }
 
-  process.stdout.write('FILE-BROWSER SMOKE: PASS — direct file startup, SQLite WASM, workspace-file APIs, hash route, and zero outbound HTTP(S).\n');
+  process.stdout.write('FILE-BROWSER SMOKE: PASS — direct file startup, SQLite WASM, workspace-file APIs, hash route, and zero outbound HTTP(S).\\n');
+
+  await stopBrowser(browser);
+  browser = await startBrowser(true);
+
+  await waitFor(
+    browser.cdp,
+    `document.body?.innerText.includes('SQLite is ready') && document.body?.innerText.includes('Open my existing workspace')`,
+    'same-page SQLite fallback when Worker is blocked',
+  );
+
+  if (browser.cdp.httpRequests.length) {
+    throw new Error(`Outbound HTTP(S) request detected during Worker fallback: ${browser.cdp.httpRequests.join(', ')}`);
+  }
+
+  process.stdout.write('WORKER-BLOCKED SMOKE: PASS — app still launches and initializes SQLite without Web Worker support.\\n');
 } catch (error) {
   let snapshot = 'browser snapshot unavailable';
   if (browser) {
