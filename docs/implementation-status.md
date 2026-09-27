@@ -1,45 +1,62 @@
 # Milestone 1 implementation status
 
-## Implemented in source
+**Status: ACCEPTED — 2026-09-27**
 
-- Vite + React + TypeScript local frontend
-- embedded SQLite WASM build path
-- OPFS SAH-pool persistence worker
-- numbered/checksummed migration system
-- normalized hierarchy and provenance schema
-- FTS5 document chunks
-- Case / Plan / Plan Year / Filing CRUD
-- eFAST CSV SHA-256, OPFS storage, raw-row preservation, expected filings
-- bulk local PDF SHA-256, OPFS storage, PDF.js byte-only extraction
-- deterministic PDF/eFAST matching with matched / ambiguous / unmatched states
-- 2024 Schedule H Part I 1C9 BOY/EOY positional parser
-- extraction review with verify/correct/delete and immutable correction revision
-- exact-location and canonical-concept SQL retrieval
-- local PDF page rendering for provenance
-- read-only SQL console
-- SQLite database export/restore
-- zero-network CSP, eager network-global lockdown, source audit, loopback-only static server
-- future local-RAG schema only; no model added
-- first Ragtime 5500 navigation and visual-design system for workflow-oriented use
+Milestone 1 has completed both automated CI gates and target-workstation acceptance.
 
-## Executed in the original build session
+## Accepted architecture
 
-PASS:
+- Vite + React + TypeScript frontend
+- exactly one production artifact: `dist/ragtime5500.html`
+- direct `file://` office runtime; no server, localhost process, backend, CDN, or internet requirement
+- SQLite WASM bundled inside the HTML
+- same-page SQLite compatibility runtime for direct-file deployment
+- user-selected local SQLite workspace file for persistence
+- numbered/checksummed schema migrations
+- normalized case → plan → plan year → filing → source-document → line-definition → filing-value model
+- imported source bytes stored inside the SQLite workspace
+- SQLite FTS5 document chunks for local retrieval
+- PDF.js bundled locally and fed only user-selected local PDF bytes
+- zero-outbound-network CSP and runtime lockdown
+- eFAST URLs stored only as provenance strings
+- full-workspace backup/restore with SHA-256 validation
+- SQLite-only export/restore
+- visible process progress/status for non-instant operations
 
-- pure TypeScript CSV / matcher / H-1C9 algorithm tests
-- SQLite DDL application with FTS5
-- foreign-key check
-- canonical-concept lookup
-- synthetic acceptance-query fixture
-- correction-history preservation
-- SQLite backup/restore integrity
-- first-party zero-network source audit
+## Accepted Milestone 1 vertical slice
 
-Still required before Milestone 1 is formally accepted:
+- eFAST CSV raw-row preservation
+- target plan-number selection and normalization
+- automatic exclusion of non-target plan rows from matching
+- bulk import of the designated local Form 5500 PDF set
+- stable deterministic multi-PDF batch matching
+- matched / ambiguous / unmatched review states
+- 2024 Schedule H Part I 1C9 BOY/EOY positional extraction
+- rejection of hidden fillable-form placeholder numerals
+- source filename, source page, raw source text, extraction method, confidence, and verification state
+- deterministic exact-location SQL retrieval
+- canonical-concept retrieval
+- audit history for classification, matching, relinking, verification, and correction
+- persistence after closing and reopening the browser
+- full-workspace backup and restore into a new workspace
+- SQLite `quick_check=ok` and zero foreign-key violations after restore
+- successful retrieval of the designated acceptance values after restore
+- successful target-workstation use with the network disconnected
 
-- full dependency-backed Vite/React browser build in an environment with the npm dependencies available
-- OPFS persistence across a real browser/workstation restart
-- DevTools confirmation of zero outbound requests on the production bundle
-- designated real 2024 acceptance source-PDF page verification
+## Automated release gates
 
-Synthetic fixtures prove the schema/query/parser contract; they do **not** replace source-PDF verification.
+The `main` workflow verifies:
+
+- TypeScript and Vitest suite
+- SQLite schema contracts
+- production build
+- source/network audit
+- single-HTML artifact audit
+- direct `file://` Chromium smoke test
+- no browser-initiated outbound HTTP(S)
+- final artifact checksum
+- publication to the `office-builds` branch only after the check job succeeds
+
+## Public repository data policy
+
+The repository records the acceptance result and software behavior, but not case materials. Real case PDFs, CSVs, SQLite workspaces, plan names, and designated source values remain local to the office/test workspace.
