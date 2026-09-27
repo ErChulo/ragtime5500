@@ -983,9 +983,12 @@ export async function listStructuredExtractionRules(
 export async function listExtractionCoverage(
   formYear?: number,
 ): Promise<Array<Record<string, unknown>>> {
+  const clauses = ['r.active=1'];
   const bind: number[] = [];
-  const where = formYear == null ? '' : 'WHERE fd.form_year=?';
-  if (formYear != null) bind.push(formYear);
+  if (formYear != null) {
+    clauses.push('fd.form_year=?');
+    bind.push(formYear);
+  }
   return db.exec(
     `SELECT fd.form_year,r.schedule_name,r.part,r.location_reference,
             MIN(ld.label) AS label,MIN(ld.canonical_concept) AS canonical_concept,
@@ -998,12 +1001,11 @@ export async function listExtractionCoverage(
         AND ld.schedule_name=r.schedule_name
         AND ld.part=r.part
         AND ld.location_reference=r.location_reference
-       ${where}
-      WHERE r.active=1 ${formYear == null ? '' : 'AND fd.form_year=?'}
+      WHERE ${clauses.join(' AND ')}
       GROUP BY fd.form_year,r.schedule_name,r.part,r.location_reference,
                r.strategy,r.source_authority,r.source_reference
       ORDER BY fd.form_year DESC,r.schedule_name,r.part,r.location_reference`,
-    formYear == null ? [] : [formYear],
+    bind,
   );
 }
 
