@@ -64,7 +64,7 @@ The repository records the acceptance result and software behavior, but not case
 
 # Milestone 2 implementation status
 
-**Status: RELEASE CANDIDATE — v0.2.0-rc.1**
+**Status: RELEASE CANDIDATE — v0.2.0-rc.2**
 
 Milestone 2 extends the accepted direct-file architecture without changing the office runtime contract.
 

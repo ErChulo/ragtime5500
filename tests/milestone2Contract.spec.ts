@@ -10,8 +10,8 @@ describe('Milestone 2 metadata extraction contract', () => {
   it('identifies the Milestone 2 candidate consistently', () => {
     const pkg = JSON.parse(source('package.json')) as { version: string };
     const version = source('src/app/version.ts');
-    expect(pkg.version).toBe('0.2.0-rc.1');
-    expect(version).toContain("APP_VERSION = '0.2.0-rc.1'");
+    expect(pkg.version).toBe('0.2.0-rc.2');
+    expect(version).toContain("APP_VERSION = '0.2.0-rc.2'");
     expect(version).toContain("APP_CHANNEL = 'Milestone 2 metadata extraction candidate'");
   });
 

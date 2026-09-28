@@ -1,12 +1,12 @@
 # Milestone 2 target-workstation test plan
 
-**Candidate:** v0.2.0-rc.1  
+**Candidate:** v0.2.0-rc.2  
 **Baseline:** accepted Milestone 1 v0.1.1 workspace  
 **Rule:** Use a copy of the accepted workspace. Do not risk the accepted baseline during candidate testing.
 
 ## Test 1 — Open the copied workspace
 
-**Do:** Open v0.2.0-rc.1 directly from disk and choose a copy of the accepted v0.1.1 SQLite workspace.
+**Do:** Open v0.2.0-rc.2 directly from disk and choose a copy of the accepted v0.1.1 SQLite workspace.
 
 **Expect:** The application opens normally, reports the Milestone 2 candidate version, and the existing case/filings remain present.
 
