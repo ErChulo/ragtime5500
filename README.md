@@ -16,7 +16,7 @@
 For the air-gapped office workstation, download the tested standalone HTML from the dedicated `office-builds` branch:
 
 - **[Download latest single-HTML build](https://github.com/ErChulo/ragtime5500/raw/office-builds/ragtime5500-latest.html)**
-- [Download Milestone 2 candidate v0.2.0-rc.1](https://github.com/ErChulo/ragtime5500/raw/office-builds/ragtime5500-v0.2.0-rc.1.html)
+- [Download Milestone 2 candidate v0.2.0-rc.2](https://github.com/ErChulo/ragtime5500/raw/office-builds/ragtime5500-v0.2.0-rc.2.html)
 - [Download accepted Milestone 1 stable v0.1.1](https://github.com/ErChulo/ragtime5500/raw/office-builds/ragtime5500-v0.1.1.html)
 - [SHA-256 checksums](https://github.com/ErChulo/ragtime5500/blob/office-builds/SHA256SUMS.txt)
 - [Published version](https://github.com/ErChulo/ragtime5500/blob/office-builds/VERSION.txt)
@@ -157,7 +157,7 @@ The designated local acceptance filing must only be marked verified after its ac
 
 ## Milestone 2 candidate scope
 
-Version **v0.2.0-rc.1** generalizes the accepted Milestone 1 extraction path into a metadata-driven Schedule H engine while preserving the same offline/direct-file architecture.
+Version **v0.2.0-rc.2** generalizes the accepted Milestone 1 extraction path into a metadata-driven Schedule H engine while preserving the same offline/direct-file architecture.
 
 The candidate adds:
 
