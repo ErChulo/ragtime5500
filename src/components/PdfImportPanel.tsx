@@ -1,14 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { storeLocalFile } from '../ingest/opfsFiles';
-import { extractScheduleH1c9 } from '../pdf/scheduleH1c9';
 import { extractPdfPages } from '../pdf/extractText';
 import { chooseMatch, inferDocumentSignals } from '../matching/matchPdf';
 import {
   ensureSourceDocument,
   getFilingContext,
   listDocumentMatches,
-  saveExtractedValues,
 } from '../db/repository';
+import { runStructuredExtraction } from '../pdf/runStructuredExtraction';
 import {
   listTargetRowsForImport,
   preparePdfImport,
@@ -112,12 +111,12 @@ export function PdfImportPanel({
           let detail = `Match: ${saved.matchStatus}.`;
           if (saved.filingId !== null) {
             const context = await getFilingContext(saved.filingId);
-            const extracted = extractScheduleH1c9(pages);
-            if (context.planYear === 2024 && extracted.length === 2) {
-              await saveExtractedValues(saved.filingId, context.planYear, extracted);
-              detail += ` Extracted H/I/1C9 BOY=${extracted[0].normalizedNumber.toLocaleString()} and EOY=${extracted[1].normalizedNumber.toLocaleString()} from page ${extracted[0].sourcePage}.`;
-            } else if (context.planYear === 2024) {
-              detail += ' H/I/1C9 requires extraction review; no values were inferred.';
+            const extraction = await runStructuredExtraction(saved.filingId, context.planYear, pages);
+            if (extraction.ruleCount) {
+              detail += ` Structured extraction: ${extraction.valueCount} value${extraction.valueCount === 1 ? '' : 's'} from ${extraction.ruleCount} metadata rule${extraction.ruleCount === 1 ? '' : 's'}`;
+              if (extraction.extractedLocations.length) detail += ` (${extraction.extractedLocations.join(', ')})`;
+              if (extraction.issueCount) detail += `; ${extraction.issueCount} item${extraction.issueCount === 1 ? '' : 's'} require review`;
+              detail += '.';
             }
           }
 

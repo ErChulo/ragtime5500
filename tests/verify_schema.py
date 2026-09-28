@@ -7,6 +7,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 DDL = (ROOT / 'src/db/migrations/001_initial.sql').read_text(encoding='utf-8')
+M2 = (ROOT / 'src/db/migrations/005_metadata_extraction.sql').read_text(encoding='utf-8')
 
 
 def seed(conn: sqlite3.Connection) -> None:
@@ -39,6 +40,16 @@ def main() -> None:
         path = Path(td) / 'ragtime5500.sqlite3'
         conn = sqlite3.connect(path)
         conn.executescript(DDL)
+        conn.executescript(M2)
+
+        rule_count = conn.execute("SELECT COUNT(*) FROM line_extraction_rule WHERE active=1").fetchone()[0]
+        assert rule_count == 11, rule_count
+        output_count = conn.execute("""SELECT COUNT(*) FROM line_definition ld
+            JOIN form_definition fd ON fd.form_definition_id=ld.form_definition_id
+            WHERE fd.form_year=2024 AND ld.schedule_name='H' AND ld.part='I'
+              AND ld.location_reference IN ('1C9','1D1','1D2','1E','1F','1G','1H','1I','1J','1K','1L')""").fetchone()[0]
+        assert output_count == 22, output_count
+
         seed(conn)
         fk = conn.execute('PRAGMA foreign_key_check').fetchall()
         assert fk == [], fk
@@ -67,6 +78,38 @@ def main() -> None:
             WHERE py.year=2024 AND ld.canonical_concept='COMMON_COLLECTIVE_TRUST_VALUE'
             ORDER BY ld.subfield""").fetchall()
         assert concept_rows == [('BOY', 1250000.0), ('EOY', 1175000.0)], concept_rows
+
+
+        filing_id = conn.execute("SELECT filing_id FROM filing WHERE plan_year_id=?", (plan_year_id,)).fetchone()[0]
+        for location, subfield, value in [
+            ('1F', 'BOY', 5000000), ('1F', 'EOY', 4800000),
+            ('1K', 'BOY', 100000), ('1K', 'EOY', 90000),
+            ('1L', 'BOY', 4900000), ('1L', 'EOY', 4710000),
+        ]:
+            line_id = conn.execute("""SELECT ld.line_definition_id FROM line_definition ld
+                JOIN form_definition fd ON fd.form_definition_id=ld.form_definition_id
+                WHERE fd.form_year=2024 AND ld.schedule_name='H' AND ld.part='I'
+                  AND ld.location_reference=? AND ld.subfield=?""", (location, subfield)).fetchone()[0]
+            conn.execute("""INSERT INTO filing_value(
+                filing_id,line_definition_id,raw_value,normalized_number,extraction_method,
+                extraction_confidence,verification_status,source_page,source_text)
+                VALUES(?,?,?,?,?,?,?,?,?)""",
+                (filing_id, line_id, str(value), value, 'SYNTHETIC_M2_FIXTURE', 1.0, 'EXTRACTED_UNVERIFIED', 7, 'synthetic metadata extraction fixture'))
+
+        identity = conn.execute("""SELECT
+              MAX(CASE WHEN ld.location_reference='1F' AND ld.subfield='EOY' THEN fv.normalized_number END),
+              MAX(CASE WHEN ld.location_reference='1K' AND ld.subfield='EOY' THEN fv.normalized_number END),
+              MAX(CASE WHEN ld.location_reference='1L' AND ld.subfield='EOY' THEN fv.normalized_number END)
+            FROM filing_value fv
+            JOIN line_definition ld ON ld.line_definition_id=fv.line_definition_id
+            WHERE fv.filing_id=?""", (filing_id,)).fetchone()
+        assert identity == (4800000.0, 90000.0, 4710000.0), identity
+        assert identity[2] == identity[0] - identity[1]
+
+        conn.execute("""INSERT INTO filing_validation_result(
+            filing_id,rule_code,subfield,status,severity,observed_number,expected_number,message)
+            VALUES(?, 'H_PART_I_NET_ASSETS_IDENTITY', 'EOY', 'PASS', 'INFO', ?, ?, 'synthetic pass')""",
+            (filing_id, identity[2], identity[0] - identity[1]))
 
         acceptance_sql = """
         SELECT fv.normalized_number
@@ -105,10 +148,10 @@ def main() -> None:
         backup.write_bytes(path.read_bytes())
         restored = sqlite3.connect(backup)
         assert restored.execute('PRAGMA integrity_check').fetchone()[0] == 'ok'
-        assert restored.execute("SELECT COUNT(*) FROM filing_value").fetchone()[0] == 2
+        assert restored.execute("SELECT COUNT(*) FROM filing_value").fetchone()[0] == 8
         restored.close()
 
-    print('SCHEMA / ACCEPTANCE SQL / REVISION / BACKUP TEST: PASS')
+    print('SCHEMA / M2 METADATA / VALIDATION / ACCEPTANCE SQL / REVISION / BACKUP TEST: PASS')
     print('EOY = 1175000; BOY = 1250000')
     print('NOTE: values above are a synthetic schema fixture, not proof of any real source PDF page.')
 

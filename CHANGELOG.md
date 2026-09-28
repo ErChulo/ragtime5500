@@ -2,6 +2,36 @@
 
 All notable Ragtime 5500 build milestones are recorded here.
 
+## v0.2.0-rc.1 — 2026-09-27 — Milestone 2 candidate
+
+Metadata-driven Schedule H extraction candidate built on the accepted v0.1.1 baseline.
+
+### Added
+
+- schema migration v5 for extraction definitions, extraction issues, and filing validation results
+- 2024 Schedule H Part I extraction rules for 1C9, 1D1, 1D2, 1E, 1F, 1G, 1H, 1I, 1J, 1K, and 1L
+- stable canonical concepts and BOY/EOY structured fields for supported lines
+- reusable metadata-driven positional extraction engine
+- re-extraction of already stored local PDFs
+- explicit review queue for missing/ambiguous extraction evidence
+- deterministic 1L = 1F - 1K validation with PASS / FAIL / NOT_EVALUATED states
+- canonical-concept year-over-year deltas
+- Review workflow expanded to Matches → Extract → Verify values → Validate
+- progress/status feedback across Milestone 2 operations
+
+### Safety invariants retained
+
+- direct `file://` single-HTML runtime
+- zero outbound network runtime
+- no automatic eFAST retrieval
+- no inferred zero for blank cells
+- no overwrite of USER_VERIFIED or USER_CORRECTED values during re-extraction
+- ambiguous extraction fails closed
+
+### Acceptance status
+
+Automated release gates are required before publication. Target-workstation source verification is still required before Milestone 2 can be promoted from release candidate to stable.
+
 ## v0.1.1 — 2026-09-27 — Milestone 1 accepted
 
 Stable release promoted from the tested v0.1.1-rc.7 baseline after successful target-workstation acceptance.

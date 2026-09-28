@@ -1,120 +1,26 @@
-import type { Extracted5500Value, PdfPageText, PositionedToken } from '../types/domain';
+import type { Extracted5500Value, PdfPageText, StructuredExtractionRule } from '../types/domain';
+import { extractDefinedValues } from './structuredExtraction';
 
-interface TextLine {
-  y: number;
-  tokens: PositionedToken[];
-  text: string;
-}
+const rule: StructuredExtractionRule = {
+  extractionRuleId: 0,
+  formYear: 2024,
+  schedule: 'H',
+  part: 'I',
+  locationReference: '1C9',
+  canonicalConcept: 'COMMON_COLLECTIVE_TRUST_VALUE',
+  label: 'Common/collective trust value',
+  labelPattern: 'common.*collective.*trust',
+  strategy: 'POSITIONAL_BOY_EOY',
+  minValueXRatio: 0.45,
+  sourceAuthority: 'U.S. Department of Labor / IRS / PBGC',
+  sourceReference: '2024 Schedule H (Form 5500), Part I, line 1c(9)',
+  sourceUrl: null,
+};
 
-const canonicalConcept = 'COMMON_COLLECTIVE_TRUST_VALUE';
-
-function groupLines(tokens: PositionedToken[]): TextLine[] {
-  const sorted = [...tokens].sort((a, b) => Math.abs(b.y - a.y) > 2 ? b.y - a.y : a.x - b.x);
-  const lines: TextLine[] = [];
-  for (const token of sorted) {
-    const line = lines.find((candidate) => Math.abs(candidate.y - token.y) <= 2.5);
-    if (line) {
-      line.tokens.push(token);
-    } else {
-      lines.push({ y: token.y, tokens: [token], text: '' });
-    }
-  }
-  for (const line of lines) {
-    line.tokens.sort((a, b) => a.x - b.x);
-    line.text = line.tokens.map((token) => token.text).join(' ').replace(/\s+/g, ' ').trim();
-  }
-  return lines.sort((a, b) => b.y - a.y);
-}
-
-function isTargetLine(text: string): boolean {
-  const normalized = text.toLowerCase().replace(/\s+/g, ' ');
-  const hasReference = /\b1\s*c\s*\(?\s*9\s*\)?\b/i.test(normalized) || /\b1c9\b/i.test(normalized);
-  const hasLabel = /common/.test(normalized) && /(collective|trust)/.test(normalized);
-  return hasReference || hasLabel;
-}
-
-function looksLikeFormPlaceholder(digits: string): boolean {
-  // IRS/DOL fillable forms may expose template/example numerals in the PDF
-  // text layer. These are not source-reported amounts and must never be saved.
-  const compact = digits.replace(/^0+/, '');
-  return compact === '123456789012345'
-    || compact === '12345678901234'
-    || /^1234567890(?:12345)?$/.test(compact);
-}
-
-function parseMoneyToken(text: string): { raw: string; value: number } | null {
-  const trimmed = text.trim();
-  if (!/^\$?\(?-?[\d,]+\)?$/.test(trimmed)) return null;
-  const negative = trimmed.includes('(') || trimmed.includes('-');
-  const digits = trimmed.replace(/[^\d]/g, '');
-  if (!digits || looksLikeFormPlaceholder(digits)) return null;
-  const value = Number(digits) * (negative ? -1 : 1);
-  if (!Number.isSafeInteger(value)) return null;
-  return { raw: trimmed, value };
-}
-
-function extractFromLine(page: PdfPageText, line: TextLine): Extracted5500Value[] | null {
-  const numeric = line.tokens
-    .map((token) => ({ token, money: parseMoneyToken(token.text) }))
-    .filter((item): item is { token: PositionedToken; money: { raw: string; value: number } } => item.money !== null)
-    .filter((item) => item.token.x > page.width * 0.45);
-
-  if (numeric.length < 2) return null;
-
-  // Schedule H Part I reports BOY in the left amount column and EOY in the
-  // right amount column. Do not choose "the last two numbers" because the
-  // PDF text layer may also expose hidden/template numeric strings.
-  const byX = [...numeric].sort((a, b) => a.token.x - b.token.x);
-  let boy: { raw: string; value: number };
-  let eoy: { raw: string; value: number };
-
-  if (byX.length === 2) {
-    // With exactly two legitimate amount tokens, position alone identifies
-    // BOY (left) and EOY (right) without relying on a fixed page template.
-    [boy, eoy] = byX.map((item) => item.money);
-  } else {
-    const splitX = page.width * 0.76;
-    const boyCandidates = byX.filter((item) => item.token.x < splitX);
-    const eoyCandidates = byX.filter((item) => item.token.x >= splitX);
-
-    // Fail closed. Multiple surviving values in either cell are ambiguous and
-    // belong in extraction review rather than being silently inferred.
-    if (boyCandidates.length !== 1 || eoyCandidates.length !== 1) return null;
-    boy = boyCandidates[0].money;
-    eoy = eoyCandidates[0].money;
-  }
-  const confidence = /common/i.test(line.text) && /trust/i.test(line.text) ? 0.96 : 0.88;
-
-  return [
-    {
-      schedule: 'H', part: 'I', locationReference: '1C9', subfield: 'BOY',
-      canonicalConcept, rawValue: boy.raw, normalizedNumber: boy.value,
-      sourcePage: page.pageNumber, sourceText: line.text,
-      extractionMethod: 'PDFJS_POSITIONAL_LINE_1C9', confidence,
-      verificationStatus: 'EXTRACTED_UNVERIFIED',
-    },
-    {
-      schedule: 'H', part: 'I', locationReference: '1C9', subfield: 'EOY',
-      canonicalConcept, rawValue: eoy.raw, normalizedNumber: eoy.value,
-      sourcePage: page.pageNumber, sourceText: line.text,
-      extractionMethod: 'PDFJS_POSITIONAL_LINE_1C9', confidence,
-      verificationStatus: 'EXTRACTED_UNVERIFIED',
-    },
-  ];
-}
-
+/**
+ * Backward-compatible Milestone 1 entry point.
+ * The extraction implementation is now the metadata-driven engine.
+ */
 export function extractScheduleH1c9(pages: PdfPageText[]): Extracted5500Value[] {
-  const schedulePages = pages.filter((page) => /schedule\s+h/i.test(page.text));
-  const candidates = schedulePages.length ? schedulePages : pages;
-
-  for (const page of candidates) {
-    const lines = groupLines(page.tokens);
-    for (const line of lines) {
-      if (!isTargetLine(line.text)) continue;
-      const values = extractFromLine(page, line);
-      if (values) return values;
-    }
-  }
-
-  return [];
+  return extractDefinedValues(pages, [rule]).values;
 }

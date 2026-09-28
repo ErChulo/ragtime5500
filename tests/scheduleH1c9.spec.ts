@@ -52,12 +52,14 @@ describe('Schedule H 1C9 parser', () => {
     expect(extractScheduleH1c9([page])).toEqual([]);
   });
 
-  it('returns no value rather than inferring a missing column', () => {
+  it('extracts only the populated positional column without inventing the blank column', () => {
     const page: PdfPageText = {
       pageNumber: 7, width: 1000, height: 1200,
       text: 'Schedule H 1c(9) Common/collective trusts',
       tokens: [token('1c(9)', 40), token('Common/collective', 110), token('trusts', 250), token('1,175,000', 840)],
     };
-    expect(extractScheduleH1c9([page])).toEqual([]);
+    const values = extractScheduleH1c9([page]);
+    expect(values.map((value) => [value.subfield, value.normalizedNumber])).toEqual([['EOY', 1175000]]);
+    expect(values.some((value) => value.subfield === 'BOY')).toBe(false);
   });
 });
