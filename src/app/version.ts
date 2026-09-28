@@ -1,4 +1,4 @@
-export const APP_VERSION = '0.2.0-rc.1';
+export const APP_VERSION = '0.2.0-rc.2';
 export const APP_CHANNEL = 'Milestone 2 metadata extraction candidate';
 
 export function versionedArtifactName(stem: string, extension: string, dated = true): string {
