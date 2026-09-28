@@ -2,7 +2,14 @@
 
 All notable Ragtime 5500 build milestones are recorded here.
 
-## v0.2.0-rc.1 — 2026-09-27 — Milestone 2 candidate
+## v0.2.0-rc.2 — 2026-09-28 — 1C9 regression repair
+
+- preserves the accepted Milestone 1 BOY/EOY invariant when exactly two legitimate amount tokens remain after placeholder rejection;
+- uses left/right amount order instead of imperfect PDF header-token geometry for that deterministic case;
+- adds a regression fixture matching the target-workstation 1C9 failure pattern;
+- retains fail-closed ambiguity handling when more than two legitimate numeric candidates remain.
+
+## v0.2.0-rc.2 — 2026-09-27 — Milestone 2 candidate
 
 Metadata-driven Schedule H extraction candidate built on the accepted v0.1.1 baseline.
 
