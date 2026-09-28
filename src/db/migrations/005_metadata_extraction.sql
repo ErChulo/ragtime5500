@@ -97,9 +97,9 @@ INSERT OR IGNORE INTO line_extraction_rule(
 )
 SELECT fd.form_definition_id, 'H', 'I', r.location_reference, r.label_pattern,
        'POSITIONAL_BOY_EOY', 0.45,
-       'U.S. Department of Labor / IRS / PBGC',
+       'U.S. Department of Labor',
        r.source_reference,
-       'https://www.dol.gov/agencies/ebsa/employers-and-advisers/plan-administration-and-compliance/reporting-and-filing/form-5500'
+       'https://www.dol.gov/sites/dolgov/files/ebsa/employers-and-advisers/plan-administration-and-compliance/reporting-and-filing/form-5500/2024-schedule-h.pdf'
 FROM form_definition fd
 JOIN (
   SELECT '1C9' AS location_reference, 'common.*collective.*trust' AS label_pattern,
