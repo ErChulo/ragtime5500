@@ -1,6 +1,6 @@
 # Milestone 2 implementation plan
 
-**Candidate:** v0.2.0-rc.1  
+**Candidate:** v0.2.0-rc.2  
 **Purpose:** Generalize the accepted Milestone 1 Form 5500 extraction path into a metadata-driven Schedule H engine without changing the direct-file/offline runtime contract.
 
 ## Scope
