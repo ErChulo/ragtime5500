@@ -142,6 +142,29 @@ function extractBoyEoy(
   if (!numeric.length) return { values: [], issue: null };
 
   const centers = detectColumnCenters(page);
+
+  // Preserve the accepted Milestone 1 invariant: after placeholder rejection,
+  // exactly two legitimate amount tokens on a BOY/EOY line are unambiguous by
+  // horizontal order. Do not let imperfect PDF header token geometry turn
+  // that deterministic case into an extraction issue.
+  if (numeric.length === 2) {
+    const ordered = [...numeric].sort((a, b) => a.token.x - b.token.x);
+    const confidence = Math.min(
+      0.99,
+      0.84
+        + (referenceMatched ? 0.07 : 0)
+        + (labelMatched ? 0.04 : 0)
+        + (centers.detectedFromHeader ? 0.04 : 0),
+    );
+    return {
+      values: [
+        makeValue(rule, 'BOY', ordered[0].money, page, line, confidence),
+        makeValue(rule, 'EOY', ordered[1].money, page, line, confidence),
+      ],
+      issue: null,
+    };
+  }
+
   const buckets: Record<'BOY' | 'EOY', typeof numeric> = { BOY: [], EOY: [] };
 
   for (const item of numeric) {
