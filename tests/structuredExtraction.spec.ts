@@ -91,6 +91,26 @@ describe('metadata-driven Schedule H extraction', () => {
     expect(result.values.some((value) => Math.abs(value.normalizedNumber) === 123456789012345)).toBe(false);
   });
 
+  it('uses left/right order when exactly two legitimate values survive even if header token geometry is misleading', () => {
+    const result = extractDefinedValues([
+      page([
+        token('Beginning of Year', 100, 700),
+        token('End of Year', 200, 700),
+        token('1c(9)', 40, 600), token('Common/collective', 120, 600), token('trusts', 260, 600),
+        token('-123456789012345', 610, 600),
+        token('1133669', 650, 600),
+        token('-123456789012345', 780, 600),
+        token('957892', 840, 600),
+      ]),
+    ], [rule('1C9', 'COMMON_COLLECTIVE_TRUST_VALUE', 'common.*collective.*trust')]);
+
+    expect(result.issues).toEqual([]);
+    expect(result.values.map((value) => [value.subfield, value.normalizedNumber])).toEqual([
+      ['BOY', 1133669],
+      ['EOY', 957892],
+    ]);
+  });
+
   it('fails closed when more than one legitimate number lands in one amount column', () => {
     const result = extractDefinedValues([
       page([
